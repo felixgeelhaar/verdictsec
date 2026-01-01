@@ -55,7 +55,12 @@ go install github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@latest
 
 ```bash
 go install github.com/felixgeelhaar/verdictsec/cmd/verdict@latest
-go install github.com/felixgeelhaar/verdictsec/cmd/verdict-mcp@latest
+```
+
+Or via Homebrew:
+
+```bash
+brew install felixgeelhaar/tap/verdictsec
 ```
 
 ### Build from Source
@@ -64,7 +69,6 @@ go install github.com/felixgeelhaar/verdictsec/cmd/verdict-mcp@latest
 git clone https://github.com/felixgeelhaar/verdictsec.git
 cd verdictsec
 go build -o verdict ./cmd/verdict
-go build -o verdict-mcp ./cmd/verdict-mcp
 ```
 
 ## Quick Start
@@ -159,10 +163,10 @@ Start the MCP server for AI assistant integration:
 
 ```bash
 # Stdio transport (for Claude Desktop)
-verdict-mcp
+verdict mcp serve
 
 # HTTP transport
-verdict-mcp --transport http --http-addr :8080
+verdict mcp serve --transport http --http-addr :8080
 ```
 
 ### Claude Desktop Integration
@@ -173,8 +177,8 @@ Add to your `claude_desktop_config.json`:
 {
   "mcpServers": {
     "verdictsec": {
-      "command": "verdict-mcp",
-      "args": []
+      "command": "verdict",
+      "args": ["mcp", "serve"]
     }
   }
 }
@@ -212,9 +216,8 @@ Add to your `claude_desktop_config.json`:
 VerdictSec follows hexagonal architecture (ports and adapters):
 
 ```
-cmd/                    # CLI entry points
-  verdict/              # Main CLI
-  verdict-mcp/          # MCP server
+cmd/
+  verdict/              # CLI (includes MCP server)
 internal/
   domain/               # Business logic
     finding/            # Finding entity
