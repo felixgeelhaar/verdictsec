@@ -170,7 +170,8 @@ func TestOutputEnginesJSON(t *testing.T) {
 	os.Stdout = oldStdout
 
 	var buf bytes.Buffer
-	io.Copy(&buf, r)
+	_, copyErr := io.Copy(&buf, r)
+	require.NoError(t, copyErr)
 	output := buf.String()
 
 	assert.NoError(t, err)
@@ -456,7 +457,8 @@ func TestOutputEnginesJSON_Empty(t *testing.T) {
 	os.Stdout = oldStdout
 
 	var buf bytes.Buffer
-	io.Copy(&buf, r)
+	_, copyErr := io.Copy(&buf, r)
+	require.NoError(t, copyErr)
 	output := buf.String()
 
 	assert.NoError(t, err)
