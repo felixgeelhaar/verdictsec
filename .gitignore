@@ -1,0 +1,25 @@
+# Binaries
+verdict
+verdict-mcp
+*.exe
+
+# Coverage
+coverage.out
+*.out
+.cover/
+
+# VerdictSec output
+.verdict/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local config
+.claude/settings.local.json
