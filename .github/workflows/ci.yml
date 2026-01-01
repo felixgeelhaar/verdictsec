@@ -30,7 +30,7 @@ jobs:
         run: go install github.com/felixgeelhaar/coverctl@latest
 
       - name: Check coverage thresholds
-        run: coverctl check --profile=coverage.out
+        run: coverctl check --profile=coverage.out --configPath=.coverctl.yaml
 
   lint:
     runs-on: ubuntu-latest
