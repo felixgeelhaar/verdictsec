@@ -1,6 +1,6 @@
 # Binaries
-verdict
-verdict-mcp
+/verdict
+/verdict-mcp
 *.exe
 
 # Coverage
