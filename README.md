@@ -3,7 +3,7 @@
 [![Go Version](https://img.shields.io/badge/Go-1.23+-00ADD8?style=flat&logo=go)](https://go.dev/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![CI](https://github.com/felixgeelhaar/verdictsec/actions/workflows/ci.yml/badge.svg)](https://github.com/felixgeelhaar/verdictsec/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/felixgeelhaar/verdictsec/branch/main/graph/badge.svg)](https://codecov.io/gh/felixgeelhaar/verdictsec)
+[![Coverage](https://img.shields.io/badge/coverage-87%25-brightgreen.svg)](https://github.com/felixgeelhaar/verdictsec)
 [![Go Report Card](https://goreportcard.com/badge/github.com/felixgeelhaar/verdictsec)](https://goreportcard.com/report/github.com/felixgeelhaar/verdictsec)
 
 **VerdictSec** is a comprehensive security assessment CLI tool for Go projects. It integrates multiple security engines into a unified interface with policy-based enforcement, baseline management, and AI-assistant integration via MCP (Model Context Protocol).

@@ -23,14 +23,14 @@ jobs:
       - name: Download dependencies
         run: go mod download
 
-      - name: Run tests
+      - name: Run tests with coverage
         run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
 
-      - name: Upload coverage
-        uses: codecov/codecov-action@v4
-        with:
-          file: ./coverage.out
-          fail_ci_if_error: false
+      - name: Install coverctl
+        run: go install github.com/felixgeelhaar/coverctl@latest
+
+      - name: Check coverage thresholds
+        run: coverctl check --profile=coverage.out
 
   lint:
     runs-on: ubuntu-latest

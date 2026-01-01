@@ -1,0 +1,29 @@
+version: "1"
+
+# Coverage thresholds per domain
+domains:
+  cmd:
+    threshold: 80
+    paths:
+      - cmd/
+  application:
+    threshold: 80
+    paths:
+      - internal/application/
+  domain:
+    threshold: 80
+    paths:
+      - internal/domain/
+  infrastructure:
+    threshold: 80
+    paths:
+      - internal/infrastructure/
+  pkg:
+    threshold: 80
+    paths:
+      - pkg/
+
+# Global settings
+settings:
+  fail_under: 80
+  ratchet: false
