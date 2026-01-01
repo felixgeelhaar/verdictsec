@@ -1235,6 +1235,7 @@ policy:
 }
 
 func TestRunBaselineUpdate_ReasonRequired(t *testing.T) {
+	SkipIfNoEngines(t)
 	tmpDir := t.TempDir()
 	configPath := tmpDir + "/config.yaml"
 
@@ -1719,6 +1720,7 @@ policy:
 }
 
 func TestRunBaselineWrite_ReasonRequired(t *testing.T) {
+	SkipIfNoEngines(t)
 	tmpDir := t.TempDir()
 	configPath := tmpDir + "/config.yaml"
 
