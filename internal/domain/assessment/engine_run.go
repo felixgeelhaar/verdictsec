@@ -14,6 +14,9 @@ type EngineRun struct {
 	success       bool
 	errorMessage  string
 	findingCount  int
+	// Evidence fields for debugging and audit
+	rawOutput    []byte
+	outputFormat string
 }
 
 // NewEngineRun creates a new EngineRun.
@@ -54,6 +57,18 @@ func (r *EngineRun) ErrorMessage() string { return r.errorMessage }
 // FindingCount returns the number of findings detected.
 func (r *EngineRun) FindingCount() int { return r.findingCount }
 
+// RawOutput returns the raw engine output for debugging.
+func (r *EngineRun) RawOutput() []byte { return r.rawOutput }
+
+// OutputFormat returns the format of the raw output (e.g., "json", "sarif").
+func (r *EngineRun) OutputFormat() string { return r.outputFormat }
+
+// SetEvidence stores the raw engine output for audit purposes.
+func (r *EngineRun) SetEvidence(rawOutput []byte, format string) {
+	r.rawOutput = rawOutput
+	r.outputFormat = format
+}
+
 // Complete marks the engine run as completed successfully.
 func (r *EngineRun) Complete(findingCount int) {
 	r.completedAt = time.Now().UTC()
@@ -72,14 +87,16 @@ func (r *EngineRun) Fail(err error) {
 
 // EngineRunData is the serializable representation of an EngineRun.
 type EngineRunData struct {
-	EngineID      string        `json:"engine_id"`
-	EngineVersion string        `json:"engine_version"`
-	StartedAt     time.Time     `json:"started_at"`
-	CompletedAt   time.Time     `json:"completed_at"`
-	DurationMs    int64         `json:"duration_ms"`
-	Success       bool          `json:"success"`
-	ErrorMessage  string        `json:"error_message,omitempty"`
-	FindingCount  int           `json:"finding_count"`
+	EngineID      string    `json:"engine_id"`
+	EngineVersion string    `json:"engine_version"`
+	StartedAt     time.Time `json:"started_at"`
+	CompletedAt   time.Time `json:"completed_at"`
+	DurationMs    int64     `json:"duration_ms"`
+	Success       bool      `json:"success"`
+	ErrorMessage  string    `json:"error_message,omitempty"`
+	FindingCount  int       `json:"finding_count"`
+	OutputFormat  string    `json:"output_format,omitempty"`
+	// RawOutput is excluded from JSON to avoid bloat; access via API if needed
 }
 
 // ToData converts an EngineRun to its serializable form.
@@ -93,6 +110,7 @@ func (r *EngineRun) ToData() EngineRunData {
 		Success:       r.success,
 		ErrorMessage:  r.errorMessage,
 		FindingCount:  r.findingCount,
+		OutputFormat:  r.outputFormat,
 	}
 }
 
@@ -106,5 +124,6 @@ func EngineRunFromData(data EngineRunData) *EngineRun {
 		success:       data.Success,
 		errorMessage:  data.ErrorMessage,
 		findingCount:  data.FindingCount,
+		outputFormat:  data.OutputFormat,
 	}
 }

@@ -45,10 +45,11 @@ func NewTarget(path string, exclusions ...string) Target {
 
 // EngineConfig holds engine-specific configuration.
 type EngineConfig struct {
-	Enabled     bool
-	MinSeverity finding.Severity
-	ExcludeIDs  []string          // Rule IDs to exclude
-	Settings    map[string]string // Engine-specific settings
+	Enabled         bool
+	MinSeverity     finding.Severity
+	ExcludeIDs      []string                    // Rule IDs to exclude
+	Settings        map[string]string           // Engine-specific settings
+	SeverityMapping map[string]finding.Severity // Rule ID -> severity overrides
 }
 
 // DefaultEngineConfig returns a default engine configuration.

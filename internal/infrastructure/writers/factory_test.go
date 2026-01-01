@@ -51,16 +51,19 @@ func TestFactory_Create_JSON(t *testing.T) {
 	assert.True(t, ok)
 }
 
-func TestFactory_Create_SARIF_NotImplemented(t *testing.T) {
+func TestFactory_Create_SARIF(t *testing.T) {
 	f := NewFactory()
 
 	config := ports.OutputConfig{}
 
 	writer, err := f.Create(ports.OutputFormatSARIF, config)
 
-	assert.Error(t, err)
-	assert.Nil(t, writer)
-	assert.Contains(t, err.Error(), "SARIF format not yet implemented")
+	require.NoError(t, err)
+	assert.NotNil(t, writer)
+
+	// Should be a SARIF writer
+	_, ok := writer.(*SARIFWriter)
+	assert.True(t, ok)
 }
 
 func TestFactory_Create_Unknown(t *testing.T) {
@@ -103,14 +106,15 @@ func TestFactory_CreateJSON(t *testing.T) {
 	assert.Equal(t, &buf, jsonWriter.out)
 }
 
-func TestFactory_CreateSARIF(t *testing.T) {
+func TestFactory_CreateSARIF_Direct(t *testing.T) {
 	var buf bytes.Buffer
 	f := NewFactory()
 
 	writer := f.CreateSARIF(&buf)
 
-	// Currently returns nil as not implemented
-	assert.Nil(t, writer)
+	assert.NotNil(t, writer)
+	sarifWriter := writer.(*SARIFWriter)
+	assert.Equal(t, &buf, sarifWriter.out)
 }
 
 func TestFactory_CreateToFile_JSON(t *testing.T) {
@@ -161,7 +165,7 @@ func TestFactory_CreateToFile_Console(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestFactory_CreateToFile_UnsupportedFormat(t *testing.T) {
+func TestFactory_CreateToFile_SARIF(t *testing.T) {
 	tmpDir := t.TempDir()
 	filePath := filepath.Join(tmpDir, "output.sarif")
 
@@ -170,12 +174,32 @@ func TestFactory_CreateToFile_UnsupportedFormat(t *testing.T) {
 
 	writer, err := f.CreateToFile(ports.OutputFormatSARIF, filePath, config)
 
+	require.NoError(t, err)
+	assert.NotNil(t, writer)
+
+	// Close the writer using io.Closer interface
+	if closer, ok := writer.(io.Closer); ok {
+		err = closer.Close()
+		require.NoError(t, err)
+	}
+
+	// File should exist
+	_, err = os.Stat(filePath)
+	assert.NoError(t, err)
+}
+
+func TestFactory_CreateToFile_UnsupportedFormat(t *testing.T) {
+	tmpDir := t.TempDir()
+	filePath := filepath.Join(tmpDir, "output.txt")
+
+	f := NewFactory()
+	config := ports.OutputConfig{}
+
+	writer, err := f.CreateToFile(ports.OutputFormat("unknown"), filePath, config)
+
 	assert.Error(t, err)
 	assert.Nil(t, writer)
 	assert.Contains(t, err.Error(), "unsupported format for file output")
-
-	// Note: The file is created but then closed on error.
-	// This is expected behavior - the file will exist but be empty.
 }
 
 func TestFactory_CreateToFile_InvalidPath(t *testing.T) {
@@ -240,6 +264,24 @@ func TestFileConsoleWriter_Close(t *testing.T) {
 
 	consoleWriter := NewConsoleWriter(WithOutput(file))
 	fileWriter := &fileConsoleWriter{ConsoleWriter: consoleWriter, file: file}
+
+	err = fileWriter.Close()
+	assert.NoError(t, err)
+
+	// Verify file is actually closed by trying to write
+	_, err = file.WriteString("test")
+	assert.Error(t, err) // Should fail because file is closed
+}
+
+func TestFileSARIFWriter_Close(t *testing.T) {
+	tmpDir := t.TempDir()
+	filePath := filepath.Join(tmpDir, "test.sarif")
+
+	file, err := os.Create(filePath)
+	require.NoError(t, err)
+
+	sarifWriter := NewSARIFWriter(WithSARIFOutput(file))
+	fileWriter := &fileSARIFWriter{SARIFWriter: sarifWriter, file: file}
 
 	err = fileWriter.Close()
 	assert.NoError(t, err)

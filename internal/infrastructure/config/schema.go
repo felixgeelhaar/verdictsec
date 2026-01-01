@@ -48,10 +48,11 @@ type EnginesConfig struct {
 
 // EngineSettings holds settings for a single engine.
 type EngineSettings struct {
-	Enabled  bool              `yaml:"enabled" json:"enabled"`
-	Severity string            `yaml:"severity" json:"severity"` // Minimum severity
-	Exclude  []string          `yaml:"exclude" json:"exclude"`   // Rule IDs to exclude
-	Settings map[string]string `yaml:"settings" json:"settings"` // Engine-specific settings
+	Enabled         bool              `yaml:"enabled" json:"enabled"`
+	Severity        string            `yaml:"severity" json:"severity"`                   // Minimum severity
+	Exclude         []string          `yaml:"exclude" json:"exclude"`                     // Rule IDs to exclude
+	Settings        map[string]string `yaml:"settings" json:"settings"`                   // Engine-specific settings
+	SeverityMapping map[string]string `yaml:"severity_mapping" json:"severity_mapping"`   // Rule ID -> severity overrides
 }
 
 // OutputConfig defines output settings.
@@ -140,11 +141,21 @@ func (c *Config) ToPortsConfig() ports.Config {
 
 // toEngineConfig converts EngineSettings to ports.EngineConfig.
 func (c *Config) toEngineConfig(settings EngineSettings) ports.EngineConfig {
+	// Convert severity mapping strings to finding.Severity
+	var severityMapping map[string]finding.Severity
+	if len(settings.SeverityMapping) > 0 {
+		severityMapping = make(map[string]finding.Severity, len(settings.SeverityMapping))
+		for ruleID, severity := range settings.SeverityMapping {
+			severityMapping[ruleID] = parseSeverity(severity)
+		}
+	}
+
 	return ports.EngineConfig{
-		Enabled:     settings.Enabled,
-		MinSeverity: parseSeverity(settings.Severity),
-		ExcludeIDs:  settings.Exclude,
-		Settings:    settings.Settings,
+		Enabled:         settings.Enabled,
+		MinSeverity:     parseSeverity(settings.Severity),
+		ExcludeIDs:      settings.Exclude,
+		Settings:        settings.Settings,
+		SeverityMapping: severityMapping,
 	}
 }
 

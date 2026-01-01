@@ -8,11 +8,25 @@ import (
 )
 
 // Normalizer converts govulncheck raw findings to domain findings.
-type Normalizer struct{}
+type Normalizer struct {
+	ruleOverrides map[string]finding.Severity
+}
 
 // NewNormalizer creates a new govulncheck normalizer.
 func NewNormalizer() *Normalizer {
-	return &Normalizer{}
+	return &Normalizer{
+		ruleOverrides: map[string]finding.Severity{},
+	}
+}
+
+// NewNormalizerWithOverrides creates a normalizer with custom rule overrides.
+func NewNormalizerWithOverrides(overrides map[string]finding.Severity) *Normalizer {
+	if overrides == nil {
+		overrides = map[string]finding.Severity{}
+	}
+	return &Normalizer{
+		ruleOverrides: overrides,
+	}
 }
 
 // Normalize converts a raw govulncheck finding to a domain finding.
@@ -26,8 +40,8 @@ func (n *Normalizer) Normalize(engineID ports.EngineID, raw ports.RawFinding) *f
 		raw.EndColumn,
 	)
 
-	// Determine severity - vulnerabilities are typically high severity
-	severity := normalizeSeverity(raw.Severity)
+	// Determine severity - check overrides first, then default mapping
+	severity := n.normalizeSeverity(raw.RuleID, raw.Severity)
 
 	// Determine confidence
 	confidence := normalizeConfidence(raw.Confidence)
@@ -86,7 +100,13 @@ func (n *Normalizer) Normalize(engineID ports.EngineID, raw ports.RawFinding) *f
 }
 
 // normalizeSeverity converts govulncheck severity to domain severity.
-func normalizeSeverity(rawSeverity string) finding.Severity {
+// It checks for rule-specific overrides first.
+func (n *Normalizer) normalizeSeverity(ruleID, rawSeverity string) finding.Severity {
+	// Check for rule-specific override first
+	if override, ok := n.ruleOverrides[ruleID]; ok {
+		return override
+	}
+
 	switch strings.ToUpper(rawSeverity) {
 	case "CRITICAL":
 		return finding.SeverityCritical

@@ -883,11 +883,10 @@ func TestCreateWriter_SARIFFormat(t *testing.T) {
 	outputFlag = ""
 	noColor = false
 
-	// SARIF format is not yet implemented
-	_, err := createWriter(cfg)
+	writer, err := createWriter(cfg)
 
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "not yet implemented")
+	require.NoError(t, err)
+	assert.NotNil(t, writer)
 }
 
 func TestVersionCommand_Execute(t *testing.T) {

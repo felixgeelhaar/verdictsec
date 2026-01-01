@@ -8,6 +8,13 @@ import (
 	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/engines/govulncheck"
 )
 
+// NormalizerConfig holds severity mappings per engine.
+type NormalizerConfig struct {
+	GosecMappings       map[string]finding.Severity
+	GovulncheckMappings map[string]finding.Severity
+	GitleaksMappings    map[string]finding.Severity
+}
+
 // CompositeNormalizer dispatches to the appropriate engine normalizer.
 type CompositeNormalizer struct {
 	gosecNorm       *gosec.Normalizer
@@ -22,6 +29,32 @@ func NewCompositeNormalizer() *CompositeNormalizer {
 		govulncheckNorm: govulncheck.NewNormalizer(),
 		gitleaksNorm:    gitleaks.NewNormalizer(),
 	}
+}
+
+// NewCompositeNormalizerWithConfig creates a normalizer with custom severity mappings.
+func NewCompositeNormalizerWithConfig(cfg NormalizerConfig) *CompositeNormalizer {
+	return &CompositeNormalizer{
+		gosecNorm:       gosec.NewNormalizerWithOverrides(cfg.GosecMappings),
+		govulncheckNorm: govulncheck.NewNormalizerWithOverrides(cfg.GovulncheckMappings),
+		gitleaksNorm:    gitleaks.NewNormalizerWithOverrides(cfg.GitleaksMappings),
+	}
+}
+
+// NewCompositeNormalizerFromPortsConfig creates a normalizer from ports.Config.
+func NewCompositeNormalizerFromPortsConfig(cfg ports.Config) *CompositeNormalizer {
+	normCfg := NormalizerConfig{}
+
+	if gosecCfg, ok := cfg.Engines[ports.EngineGosec]; ok && gosecCfg.SeverityMapping != nil {
+		normCfg.GosecMappings = gosecCfg.SeverityMapping
+	}
+	if govulnCfg, ok := cfg.Engines[ports.EngineGovulncheck]; ok && govulnCfg.SeverityMapping != nil {
+		normCfg.GovulncheckMappings = govulnCfg.SeverityMapping
+	}
+	if gitleaksCfg, ok := cfg.Engines[ports.EngineGitleaks]; ok && gitleaksCfg.SeverityMapping != nil {
+		normCfg.GitleaksMappings = gitleaksCfg.SeverityMapping
+	}
+
+	return NewCompositeNormalizerWithConfig(normCfg)
 }
 
 // Normalize converts a raw finding to a domain finding.

@@ -188,7 +188,9 @@ func (uc *RunScanUseCase) runEngineSafe(
 
 	// Execute engine (potentially long-running, no lock needed)
 	evidence, rawFindings, err := engine.Run(ctx, input.Target, engineConfig)
-	_ = evidence // unused for now
+
+	// Store evidence for audit purposes
+	run.SetEvidence(evidence.RawOutput, evidence.OutputFormat)
 
 	if err != nil {
 		run.Fail(err)
@@ -251,6 +253,10 @@ func (uc *RunScanUseCase) runEngine(
 
 	// Execute engine
 	evidence, rawFindings, err := engine.Run(ctx, input.Target, engineConfig)
+
+	// Store evidence for audit purposes
+	run.SetEvidence(evidence.RawOutput, evidence.OutputFormat)
+
 	if err != nil {
 		run.Fail(err)
 		output.Assessment.AddEngineRun(run)
@@ -282,9 +288,6 @@ func (uc *RunScanUseCase) runEngine(
 	// Complete engine run
 	run.Complete(len(findings))
 	output.Assessment.AddEngineRun(run)
-
-	// Store evidence
-	_ = evidence // TODO: Store evidence in assessment metadata
 
 	if uc.writer != nil {
 		_ = uc.writer.WriteProgress(fmt.Sprintf("%s: found %d findings", engineID, len(findings)))

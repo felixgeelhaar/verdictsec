@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/felixgeelhaar/verdictsec/internal/application/ports"
 	"github.com/felixgeelhaar/verdictsec/internal/application/usecases"
@@ -14,6 +15,7 @@ import (
 	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/baseline"
 	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/config"
 	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/engines"
+	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/watcher"
 	"github.com/felixgeelhaar/verdictsec/pkg/exitcode"
 	"github.com/spf13/cobra"
 )
@@ -26,6 +28,8 @@ var (
 	excludeEngines []string
 	includeEngines []string
 	summaryOnly    bool
+	watchMode      bool
+	watchDebounce  time.Duration
 )
 
 // scanCmd performs a full security scan
@@ -59,6 +63,8 @@ func init() {
 	scanCmd.Flags().StringSliceVar(&excludeEngines, "exclude", nil, "engines to exclude")
 	scanCmd.Flags().StringSliceVar(&includeEngines, "include", nil, "engines to include (only these will run)")
 	scanCmd.Flags().BoolVar(&summaryOnly, "summary", false, "show summary only")
+	scanCmd.Flags().BoolVarP(&watchMode, "watch", "w", false, "watch for file changes and re-run scan")
+	scanCmd.Flags().DurationVar(&watchDebounce, "watch-debounce", 500*time.Millisecond, "debounce duration for watch mode")
 
 	rootCmd.AddCommand(scanCmd)
 }
@@ -93,6 +99,11 @@ func runScan(cmd *cobra.Command, args []string) error {
 
 	// Get target path
 	target := getTarget(args)
+
+	// If watch mode is enabled, run the watcher
+	if watchMode {
+		return runWatchMode(ctx, cfg, target, writer)
+	}
 
 	// Write progress
 	_ = writer.WriteProgress(fmt.Sprintf("Starting security scan of %s", target))
@@ -253,4 +264,137 @@ func getModeString() string {
 		return "ci"
 	}
 	return "local"
+}
+
+// runWatchMode runs the scan in watch mode, re-running on file changes.
+func runWatchMode(ctx context.Context, cfg *config.Config, target string, writer ports.ArtifactWriter) error {
+	_ = writer.WriteProgress("Starting watch mode...")
+	_ = writer.WriteProgress(fmt.Sprintf("Watching for changes in %s (Ctrl+C to exit)", target))
+	_ = writer.WriteProgress("")
+
+	// Run initial scan
+	runSingleScan(ctx, cfg, target, writer)
+
+	// Create watcher config
+	watchCfg := watcher.Config{
+		Root:       target,
+		Extensions: []string{".go", ".mod", ".sum"},
+		Exclude:    []string{"vendor/", "testdata/", ".git/", "_test.go"},
+		Debounce:   watchDebounce,
+		OnChange: func(events []watcher.Event) {
+			// Clear screen for fresh output
+			fmt.Print("\033[H\033[2J")
+
+			// Show changed files
+			_ = writer.WriteProgress(fmt.Sprintf("[%s] Detected %d file change(s):",
+				time.Now().Format("15:04:05"), len(events)))
+			for _, e := range events {
+				_ = writer.WriteProgress(fmt.Sprintf("  %s: %s", e.Operation, e.Path))
+			}
+			_ = writer.WriteProgress("")
+
+			// Re-run scan
+			runSingleScan(ctx, cfg, target, writer)
+		},
+	}
+
+	w := watcher.New(watchCfg)
+	if err := w.Start(); err != nil {
+		return fmt.Errorf("failed to start watcher: %w", err)
+	}
+
+	// Wait for context cancellation
+	<-ctx.Done()
+	w.Stop()
+
+	_ = writer.WriteProgress("\nWatch mode stopped")
+	return nil
+}
+
+// runSingleScan executes a single scan run.
+func runSingleScan(ctx context.Context, cfg *config.Config, target string, writer ports.ArtifactWriter) {
+	_ = writer.WriteProgress(fmt.Sprintf("[%s] Running security scan...", time.Now().Format("15:04:05")))
+
+	// Create engine registry
+	registry := engines.NewDefaultRegistry()
+
+	// Create composite normalizer
+	normalizer := engines.NewCompositeNormalizer()
+
+	// Create run scan use case
+	scanUseCase := usecases.NewRunScanUseCase(registry, normalizer, writer)
+
+	// Determine which engines to run
+	engineIDs := determineEngines(cfg)
+
+	// Convert to ports.EngineID
+	var portsEngineIDs []ports.EngineID
+	for _, id := range engineIDs {
+		portsEngineIDs = append(portsEngineIDs, ports.EngineID(id))
+	}
+
+	// Execute scan
+	scanInput := usecases.RunScanInput{
+		Target:     ports.NewTarget(target),
+		Config:     cfg.ToPortsConfig(),
+		Mode:       getModeString(),
+		Engines:    portsEngineIDs,
+		Parallel:   true,
+		MaxWorkers: 4,
+	}
+
+	scanOutput, err := scanUseCase.Execute(ctx, scanInput)
+	if err != nil {
+		_ = writer.WriteError(fmt.Errorf("scan failed: %w", err))
+		return
+	}
+
+	// Load baseline if specified
+	var bl *domainBaseline.Baseline
+	if baselinePath != "" || cfg.Baseline.Path != "" {
+		blPath := baselinePath
+		if blPath == "" {
+			blPath = cfg.Baseline.Path
+		}
+
+		store := baseline.NewStoreWithPath(blPath)
+		bl, err = store.Load()
+		if err != nil {
+			bl = domainBaseline.NewBaseline("")
+		}
+	} else {
+		bl = domainBaseline.NewBaseline("")
+	}
+
+	// Create evaluate policy use case
+	evalUseCase := usecases.NewEvaluatePolicyUseCase(nil)
+
+	// Build policy
+	pol := cfg.ToDomainPolicy()
+
+	// Determine mode
+	mode := policy.ModeLocal
+	if strictMode {
+		mode = policy.ModeCI
+	}
+
+	// Evaluate against policy
+	evalInput := usecases.EvaluatePolicyInput{
+		Assessment: scanOutput.Assessment,
+		Policy:     &pol,
+		Baseline:   bl,
+		Mode:       mode,
+	}
+	evalOutput := evalUseCase.Execute(evalInput)
+
+	// Write output
+	if summaryOnly {
+		_ = writer.WriteSummary(scanOutput.Assessment, evalOutput.Result)
+	} else {
+		_ = writer.WriteAssessment(scanOutput.Assessment, evalOutput.Result)
+	}
+
+	// Show press any key hint
+	_ = writer.WriteProgress("")
+	_ = writer.WriteProgress("Watching for file changes... (Ctrl+C to exit)")
 }

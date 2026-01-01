@@ -66,6 +66,7 @@ func TestNormalizer_Normalize_WithoutFunction(t *testing.T) {
 }
 
 func TestNormalizeSeverity(t *testing.T) {
+	normalizer := NewNormalizer()
 	tests := []struct {
 		input    string
 		expected finding.Severity
@@ -81,10 +82,25 @@ func TestNormalizeSeverity(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			result := normalizeSeverity(tt.input)
+			result := normalizer.normalizeSeverity("", tt.input)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
+}
+
+func TestNormalizeSeverity_WithOverrides(t *testing.T) {
+	overrides := map[string]finding.Severity{
+		"GO-2023-1234": finding.SeverityCritical,
+	}
+	normalizer := NewNormalizerWithOverrides(overrides)
+
+	// Override should take precedence
+	result := normalizer.normalizeSeverity("GO-2023-1234", "LOW")
+	assert.Equal(t, finding.SeverityCritical, result)
+
+	// Non-overridden rule should use default mapping
+	result2 := normalizer.normalizeSeverity("GO-2023-9999", "LOW")
+	assert.Equal(t, finding.SeverityLow, result2)
 }
 
 func TestNormalizeConfidence(t *testing.T) {

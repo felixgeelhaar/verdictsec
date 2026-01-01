@@ -20,6 +20,17 @@ func NewNormalizer() *Normalizer {
 	}
 }
 
+// NewNormalizerWithOverrides creates a normalizer with custom rule overrides.
+func NewNormalizerWithOverrides(overrides map[string]finding.Severity) *Normalizer {
+	merged := defaultRuleOverrides()
+	for k, v := range overrides {
+		merged[k] = v
+	}
+	return &Normalizer{
+		ruleOverrides: merged,
+	}
+}
+
 // Normalize converts a raw gitleaks finding to a domain finding.
 func (n *Normalizer) Normalize(engineID ports.EngineID, raw ports.RawFinding) *finding.Finding {
 	// Create location

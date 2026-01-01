@@ -24,9 +24,11 @@ type OutputFormat string
 
 // Available output formats.
 const (
-	OutputFormatConsole OutputFormat = "console"
-	OutputFormatJSON    OutputFormat = "json"
-	OutputFormatSARIF   OutputFormat = "sarif"
+	OutputFormatConsole       OutputFormat = "console"
+	OutputFormatJSON          OutputFormat = "json"
+	OutputFormatSARIF         OutputFormat = "sarif"
+	OutputFormatGitHubActions OutputFormat = "github"
+	OutputFormatHTML          OutputFormat = "html"
 )
 
 // Verbosity controls output detail level.

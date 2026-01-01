@@ -48,6 +48,8 @@ func TestOutputFormat_Constants(t *testing.T) {
 	assert.Equal(t, OutputFormat("console"), OutputFormatConsole)
 	assert.Equal(t, OutputFormat("json"), OutputFormatJSON)
 	assert.Equal(t, OutputFormat("sarif"), OutputFormatSARIF)
+	assert.Equal(t, OutputFormat("github"), OutputFormatGitHubActions)
+	assert.Equal(t, OutputFormat("html"), OutputFormatHTML)
 }
 
 func TestVerbosity_Constants(t *testing.T) {
