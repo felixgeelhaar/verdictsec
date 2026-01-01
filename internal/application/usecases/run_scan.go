@@ -158,23 +158,77 @@ func (uc *RunScanUseCase) runParallel(
 			case sem <- struct{}{}:
 				defer func() { <-sem }()
 
-				// Create a thread-safe output wrapper
-				localOutput := RunScanOutput{
-					Assessment: output.Assessment,
-					Errors:     []EngineError{},
-				}
-
-				uc.runEngine(ctx, input, e, &localOutput)
-
-				// Merge results
-				mu.Lock()
-				output.Errors = append(output.Errors, localOutput.Errors...)
-				mu.Unlock()
+				// Run engine with synchronized access to assessment
+				uc.runEngineSafe(ctx, input, e, output, &mu)
 			}
 		}(engine)
 	}
 
 	wg.Wait()
+}
+
+// runEngineSafe executes an engine with thread-safe assessment access.
+func (uc *RunScanUseCase) runEngineSafe(
+	ctx context.Context,
+	input RunScanInput,
+	engine ports.Engine,
+	output *RunScanOutput,
+	mu *sync.Mutex,
+) {
+	engineID := engine.ID()
+	engineConfig := input.Config.GetEngineConfig(engineID)
+
+	// Report progress (safe without lock)
+	if uc.writer != nil {
+		_ = uc.writer.WriteProgress(fmt.Sprintf("Running %s...", engineID))
+	}
+
+	// Create engine run
+	run := assessment.NewEngineRun(string(engineID), engine.Version())
+
+	// Execute engine (potentially long-running, no lock needed)
+	evidence, rawFindings, err := engine.Run(ctx, input.Target, engineConfig)
+	_ = evidence // unused for now
+
+	if err != nil {
+		run.Fail(err)
+		mu.Lock()
+		output.Assessment.AddEngineRun(run)
+		output.Errors = append(output.Errors, EngineError{
+			EngineID: engineID,
+			Error:    err,
+		})
+		mu.Unlock()
+
+		if uc.writer != nil {
+			_ = uc.writer.WriteError(fmt.Errorf("%s: %w", engineID, err))
+		}
+		return
+	}
+
+	// Normalize findings (no lock needed)
+	var findings []*finding.Finding
+	for _, raw := range rawFindings {
+		f := uc.normalizer.Normalize(engineID, raw)
+		if f != nil {
+			findings = append(findings, f)
+		}
+	}
+
+	// Complete engine run
+	run.Complete(len(findings))
+
+	// Add to assessment with lock
+	mu.Lock()
+	for _, f := range findings {
+		output.Assessment.AddFinding(f)
+	}
+	output.Assessment.AddEngineRun(run)
+	mu.Unlock()
+
+	if uc.writer != nil {
+		_ = uc.writer.WriteProgress(fmt.Sprintf("%s: found %d findings", engineID, len(findings)))
+	}
 }
 
 // runEngine executes a single engine.
