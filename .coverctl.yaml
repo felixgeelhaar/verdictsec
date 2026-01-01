@@ -1,29 +1,26 @@
 version: 1
 
-# Coverage thresholds per domain
-domains:
-  cmd:
-    threshold: 80
-    paths:
-      - cmd/
-  application:
-    threshold: 80
-    paths:
-      - internal/application/
-  domain:
-    threshold: 80
-    paths:
-      - internal/domain/
-  infrastructure:
-    threshold: 80
-    paths:
-      - internal/infrastructure/
-  pkg:
-    threshold: 80
-    paths:
-      - pkg/
-
-# Global settings
-settings:
-  fail_under: 80
-  ratchet: false
+policy:
+  default:
+    min: 80
+  domains:
+    - name: cmd
+      match:
+        - ./cmd/...
+      min: 80
+    - name: application
+      match:
+        - ./internal/application/...
+      min: 80
+    - name: domain
+      match:
+        - ./internal/domain/...
+      min: 80
+    - name: infrastructure
+      match:
+        - ./internal/infrastructure/...
+      min: 80
+    - name: pkg
+      match:
+        - ./pkg/...
+      min: 80
