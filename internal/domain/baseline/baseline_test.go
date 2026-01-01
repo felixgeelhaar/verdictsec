@@ -296,3 +296,117 @@ func TestBaseline_EnsureIndex_NilIndex(t *testing.T) {
 	exists := b.ContainsFingerprint("abc123")
 	assert.True(t, exists)
 }
+
+func TestBaseline_GetEntries(t *testing.T) {
+	b := NewBaseline("./src")
+	f1 := createTestFinding("G401")
+	f2 := createTestFinding("G402")
+	_ = b.Add(f1, testReason)
+	_ = b.Add(f2, testReason)
+
+	entries := b.GetEntries()
+	assert.Len(t, entries, 2)
+
+	// Modifying the returned slice should not affect the original
+	entries[0].Fingerprint = "modified"
+	assert.NotEqual(t, "modified", b.Entries[0].Fingerprint)
+}
+
+func TestBaseline_GetScope(t *testing.T) {
+	scope := NewScope("./src", "gosec", "govulncheck")
+	b := NewBaselineWithScope(scope)
+
+	result := b.GetScope()
+	assert.Equal(t, "./src", result.Target)
+	assert.Equal(t, []string{"gosec", "govulncheck"}, result.EngineIDs)
+}
+
+func TestBaseline_GetVersion(t *testing.T) {
+	b := NewBaseline("./src")
+	assert.Equal(t, "1", b.GetVersion())
+}
+
+func TestBaseline_GetCreatedAt(t *testing.T) {
+	before := time.Now().UTC()
+	b := NewBaseline("./src")
+	after := time.Now().UTC()
+
+	createdAt := b.GetCreatedAt()
+	assert.True(t, !createdAt.Before(before))
+	assert.True(t, !createdAt.After(after))
+}
+
+func TestBaseline_GetUpdatedAt(t *testing.T) {
+	b := NewBaseline("./src")
+	initialUpdated := b.GetUpdatedAt()
+
+	time.Sleep(10 * time.Millisecond)
+	_ = b.Add(createTestFinding("G401"), testReason)
+
+	updatedAt := b.GetUpdatedAt()
+	assert.True(t, updatedAt.After(initialUpdated))
+}
+
+func TestBaseline_ErrReasonRequired(t *testing.T) {
+	b := NewBaseline("./src")
+	f := createTestFinding("G401")
+
+	err := b.Add(f, "")
+	assert.ErrorIs(t, err, ErrReasonRequired)
+
+	err = b.AddAll([]*finding.Finding{f}, "")
+	assert.ErrorIs(t, err, ErrReasonRequired)
+}
+
+func TestBaseline_GetEntryByFingerprint(t *testing.T) {
+	b := NewBaseline("./src")
+	f := createTestFinding("G401")
+
+	// Not found initially
+	entry := b.GetEntryByFingerprint("nonexistent")
+	assert.Nil(t, entry)
+
+	// Add entry
+	_ = b.Add(f, testReason)
+
+	// Now found
+	entry = b.GetEntryByFingerprint(f.Fingerprint().Value())
+	assert.NotNil(t, entry)
+	assert.Equal(t, f.Fingerprint().Value(), entry.Fingerprint)
+}
+
+func TestBaseline_AddEntry(t *testing.T) {
+	b := NewBaseline("./src")
+
+	fingerprint := "test-fingerprint-123"
+	b.AddEntry(fingerprint, "v1", "G401", "gosec", "Test reason")
+
+	assert.Equal(t, 1, b.Count())
+	assert.True(t, b.ContainsFingerprint(fingerprint))
+
+	entry := b.GetEntryByFingerprint(fingerprint)
+	assert.NotNil(t, entry)
+	assert.Equal(t, fingerprint, entry.Fingerprint)
+	assert.Equal(t, "v1", entry.FingerprintVersion)
+	assert.Equal(t, "G401", entry.RuleID)
+	assert.Equal(t, "gosec", entry.EngineID)
+	assert.Equal(t, "Test reason", entry.Reason)
+}
+
+func TestBaseline_AddEntry_UpdateExisting(t *testing.T) {
+	b := NewBaseline("./src")
+
+	fingerprint := "test-fingerprint-123"
+	b.AddEntry(fingerprint, "v1", "G401", "gosec", "First reason")
+	originalTime := b.GetEntryByFingerprint(fingerprint).LastSeen
+
+	time.Sleep(10 * time.Millisecond)
+	b.AddEntry(fingerprint, "v1", "G401", "gosec", "Second reason")
+
+	// Should still have only one entry
+	assert.Equal(t, 1, b.Count())
+
+	// LastSeen should be updated
+	entry := b.GetEntryByFingerprint(fingerprint)
+	assert.True(t, entry.LastSeen.After(originalTime))
+}

@@ -92,3 +92,53 @@ func TestEngineRunFromData(t *testing.T) {
 	assert.True(t, run.Success())
 	assert.Equal(t, 5, run.FindingCount())
 }
+
+func TestEngineRun_SetEvidence(t *testing.T) {
+	run := NewEngineRun("gosec", "2.18.0")
+	rawOutput := []byte(`{"Issues": []}`)
+	format := "json"
+
+	run.SetEvidence(rawOutput, format)
+
+	assert.Equal(t, rawOutput, run.RawOutput())
+	assert.Equal(t, format, run.OutputFormat())
+}
+
+func TestEngineRun_RawOutput_Empty(t *testing.T) {
+	run := NewEngineRun("gosec", "2.18.0")
+
+	// Initially nil
+	assert.Nil(t, run.RawOutput())
+	assert.Empty(t, run.OutputFormat())
+}
+
+func TestEngineRun_SetEvidence_LargeOutput(t *testing.T) {
+	run := NewEngineRun("gosec", "2.18.0")
+	// Simulate large output
+	largeOutput := make([]byte, 10000)
+	for i := range largeOutput {
+		largeOutput[i] = 'x'
+	}
+
+	run.SetEvidence(largeOutput, "sarif")
+
+	assert.Equal(t, largeOutput, run.RawOutput())
+	assert.Equal(t, "sarif", run.OutputFormat())
+	assert.Len(t, run.RawOutput(), 10000)
+}
+
+func TestEngineRunFromData_WithEvidence(t *testing.T) {
+	data := EngineRunData{
+		EngineID:      "gosec",
+		EngineVersion: "2.18.0",
+		StartedAt:     time.Now().UTC(),
+		CompletedAt:   time.Now().UTC(),
+		Success:       true,
+		FindingCount:  5,
+		OutputFormat:  "json",
+	}
+
+	run := EngineRunFromData(data)
+
+	assert.Equal(t, "json", run.OutputFormat())
+}

@@ -1,7 +1,6 @@
 package baseline
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/felixgeelhaar/verdictsec/internal/domain/finding"
@@ -70,11 +69,18 @@ func (b *Baseline) GetEntry(f *finding.Finding) *Entry {
 	return b.fingerprintIndex[f.Fingerprint().Value()]
 }
 
+// GetEntryByFingerprint returns the entry for a fingerprint string, if it exists.
+func (b *Baseline) GetEntryByFingerprint(fingerprint string) *Entry {
+	b.ensureIndex()
+	return b.fingerprintIndex[fingerprint]
+}
+
 // Add adds a finding to the baseline with a reason.
 // If the finding already exists, its LastSeen is updated.
+// Returns ErrReasonRequired if reason is empty.
 func (b *Baseline) Add(f *finding.Finding, reason string) error {
 	if reason == "" {
-		return fmt.Errorf("reason is required for baselining")
+		return ErrReasonRequired
 	}
 
 	b.ensureIndex()
@@ -92,9 +98,10 @@ func (b *Baseline) Add(f *finding.Finding, reason string) error {
 }
 
 // AddAll adds multiple findings to the baseline with a shared reason.
+// Returns ErrReasonRequired if reason is empty.
 func (b *Baseline) AddAll(findings []*finding.Finding, reason string) error {
 	if reason == "" {
-		return fmt.Errorf("reason is required for baselining")
+		return ErrReasonRequired
 	}
 	for _, f := range findings {
 		if err := b.Add(f, reason); err != nil {
@@ -188,6 +195,33 @@ func (b *Baseline) EntriesByEngine() map[string][]Entry {
 		result[e.EngineID] = append(result[e.EngineID], e)
 	}
 	return result
+}
+
+// GetEntries returns a defensive copy of all entries.
+func (b *Baseline) GetEntries() []Entry {
+	result := make([]Entry, len(b.Entries))
+	copy(result, b.Entries)
+	return result
+}
+
+// GetScope returns the baseline scope.
+func (b *Baseline) GetScope() Scope {
+	return b.Scope
+}
+
+// GetVersion returns the baseline version.
+func (b *Baseline) GetVersion() string {
+	return b.Version
+}
+
+// GetCreatedAt returns when the baseline was created.
+func (b *Baseline) GetCreatedAt() time.Time {
+	return b.CreatedAt
+}
+
+// GetUpdatedAt returns when the baseline was last updated.
+func (b *Baseline) GetUpdatedAt() time.Time {
+	return b.UpdatedAt
 }
 
 // MatchesScope returns true if the baseline scope matches the given target.

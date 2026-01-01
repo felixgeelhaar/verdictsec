@@ -181,7 +181,7 @@ func runScan(cmd *cobra.Command, args []string) error {
 		Baseline:   bl,
 		Mode:       mode,
 	}
-	evalOutput := evalUseCase.Execute(evalInput)
+	evalOutput := evalUseCase.Execute(ctx, evalInput)
 
 	// Write output
 	if summaryOnly {
@@ -385,7 +385,7 @@ func runSingleScan(ctx context.Context, cfg *config.Config, target string, write
 		Baseline:   bl,
 		Mode:       mode,
 	}
-	evalOutput := evalUseCase.Execute(evalInput)
+	evalOutput := evalUseCase.Execute(ctx, evalInput)
 
 	// Write output
 	if summaryOnly {

@@ -262,6 +262,47 @@ func TestWriteBaselineUseCase_Filter_NilBaseline(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestWriteBaselineUseCase_Filter_ByEngine(t *testing.T) {
+	store := newMockBaselineStore()
+	uc := NewWriteBaselineUseCase(store, nil)
+
+	// Create baseline with findings from different engines
+	b := baseline.NewBaseline("/test")
+	loc := finding.NewLocation("test.go", 10, 1, 10, 20)
+	gosecFinding := finding.NewFinding(finding.FindingTypeSAST, "gosec", "G101", "Test", finding.SeverityHigh, loc)
+	govulnFinding := finding.NewFinding(finding.FindingTypeVuln, "govulncheck", "GO-2024-001", "Test", finding.SeverityHigh, loc)
+	_ = b.Add(gosecFinding, testBaselineReason)
+	_ = b.Add(govulnFinding, testBaselineReason)
+
+	// Filter to keep only gosec
+	output, err := uc.Filter(FilterInput{
+		Baseline:  b,
+		EngineIDs: []string{"gosec"},
+	})
+
+	assert.NoError(t, err)
+	assert.Equal(t, 1, output.EntriesRemoved)
+	assert.Equal(t, 1, output.Baseline.Count())
+}
+
+func TestWriteBaselineUseCase_Filter_NoEngineFilter(t *testing.T) {
+	store := newMockBaselineStore()
+	uc := NewWriteBaselineUseCase(store, nil)
+
+	b := baseline.NewBaseline("/test")
+	_ = b.Add(createBaselineFinding("G101", 10), testBaselineReason)
+	_ = b.Add(createBaselineFinding("G102", 20), testBaselineReason)
+
+	// Filter without engine filter - should keep all
+	output, err := uc.Filter(FilterInput{
+		Baseline: b,
+	})
+
+	assert.NoError(t, err)
+	assert.Equal(t, 0, output.EntriesRemoved)
+	assert.Equal(t, 2, output.Baseline.Count())
+}
+
 func TestWriteBaselineUseCase_LoadOrCreate_NoExisting(t *testing.T) {
 	store := newMockBaselineStore()
 	store.exists = false

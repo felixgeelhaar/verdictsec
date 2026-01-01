@@ -142,7 +142,7 @@ func runCI(cmd *cobra.Command, args []string) error {
 		Baseline:   bl,
 		Mode:       policy.ModeCI,
 	}
-	evalOutput := evalUseCase.Execute(evalInput)
+	evalOutput := evalUseCase.Execute(ctx, evalInput)
 
 	// Write output
 	if err := writer.WriteAssessment(scanOutput.Assessment, evalOutput.Result); err != nil {

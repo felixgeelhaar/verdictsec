@@ -1,6 +1,7 @@
 package usecases
 
 import (
+	"context"
 	"testing"
 
 	"github.com/felixgeelhaar/verdictsec/internal/application/ports"
@@ -26,7 +27,7 @@ func TestEvaluatePolicyUseCase_Execute_NoFindings(t *testing.T) {
 	a := assessment.NewAssessment("/test")
 	pol := policy.DefaultPolicy()
 
-	output := uc.Execute(EvaluatePolicyInput{
+	output := uc.Execute(context.Background(), EvaluatePolicyInput{
 		Assessment: a,
 		Policy:     &pol,
 		Baseline:   nil,
@@ -43,7 +44,7 @@ func TestEvaluatePolicyUseCase_Execute_HighSeverityFails(t *testing.T) {
 	a.AddFinding(createTestFinding("G401", finding.SeverityHigh))
 	pol := policy.DefaultPolicy()
 
-	output := uc.Execute(EvaluatePolicyInput{
+	output := uc.Execute(context.Background(), EvaluatePolicyInput{
 		Assessment: a,
 		Policy:     &pol,
 		Baseline:   nil,
@@ -61,7 +62,7 @@ func TestEvaluatePolicyUseCase_Execute_MediumSeverityWarns(t *testing.T) {
 	a.AddFinding(createTestFinding("G401", finding.SeverityMedium))
 	pol := policy.DefaultPolicy()
 
-	output := uc.Execute(EvaluatePolicyInput{
+	output := uc.Execute(context.Background(), EvaluatePolicyInput{
 		Assessment: a,
 		Policy:     &pol,
 		Baseline:   nil,
@@ -84,7 +85,7 @@ func TestEvaluatePolicyUseCase_Execute_WithBaseline(t *testing.T) {
 	base := baseline.NewBaseline("/test")
 	_ = base.Add(f, "Test baseline reason")
 
-	output := uc.Execute(EvaluatePolicyInput{
+	output := uc.Execute(context.Background(), EvaluatePolicyInput{
 		Assessment: a,
 		Policy:     &pol,
 		Baseline:   base,
@@ -111,7 +112,7 @@ func TestEvaluatePolicyUseCase_EvaluateWithDiff(t *testing.T) {
 	base := baseline.NewBaseline("/test")
 	_ = base.Add(existingFinding, "Test baseline reason")
 
-	output, diff := uc.EvaluateWithDiff(EvaluatePolicyInput{
+	output, diff := uc.EvaluateWithDiff(context.Background(), EvaluatePolicyInput{
 		Assessment: a,
 		Policy:     &pol,
 		Baseline:   base,
@@ -130,7 +131,7 @@ func TestEvaluatePolicyUseCase_QuickEvaluate(t *testing.T) {
 
 	cfg := ports.DefaultConfig()
 
-	output := uc.QuickEvaluate(QuickEvaluateInput{
+	output := uc.QuickEvaluate(context.Background(), QuickEvaluateInput{
 		Assessment: a,
 		Config:     cfg,
 		Mode:       policy.ModeLocal,

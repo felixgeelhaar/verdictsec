@@ -206,7 +206,7 @@ func (w *JSONWriter) buildFinding(f *finding.Finding, result services.Evaluation
 
 	// Redact sensitive metadata
 	metadata := f.Metadata()
-	if metadata != nil && len(metadata) > 0 {
+	if len(metadata) > 0 {
 		jf.Metadata = w.redactor.RedactMap(metadata)
 	}
 

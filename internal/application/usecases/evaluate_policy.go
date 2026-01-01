@@ -1,6 +1,8 @@
 package usecases
 
 import (
+	"context"
+
 	"github.com/felixgeelhaar/verdictsec/internal/application/ports"
 	"github.com/felixgeelhaar/verdictsec/internal/domain/assessment"
 	"github.com/felixgeelhaar/verdictsec/internal/domain/baseline"
@@ -40,7 +42,7 @@ func NewEvaluatePolicyUseCase(writer ports.ArtifactWriter) *EvaluatePolicyUseCas
 }
 
 // Execute evaluates the assessment against policy.
-func (uc *EvaluatePolicyUseCase) Execute(input EvaluatePolicyInput) EvaluatePolicyOutput {
+func (uc *EvaluatePolicyUseCase) Execute(_ context.Context, input EvaluatePolicyInput) EvaluatePolicyOutput {
 	// Get findings from assessment
 	findings := input.Assessment.Findings()
 
@@ -68,8 +70,8 @@ func (uc *EvaluatePolicyUseCase) Execute(input EvaluatePolicyInput) EvaluatePoli
 }
 
 // EvaluateWithDiff evaluates and also computes diff against baseline.
-func (uc *EvaluatePolicyUseCase) EvaluateWithDiff(input EvaluatePolicyInput) (EvaluatePolicyOutput, services.DiffResult) {
-	output := uc.Execute(input)
+func (uc *EvaluatePolicyUseCase) EvaluateWithDiff(ctx context.Context, input EvaluatePolicyInput) (EvaluatePolicyOutput, services.DiffResult) {
+	output := uc.Execute(ctx, input)
 
 	// Compute diff
 	diff := uc.diffService.Diff(input.Assessment.Findings(), input.Baseline)
@@ -85,9 +87,9 @@ type QuickEvaluateInput struct {
 }
 
 // QuickEvaluate evaluates using config's embedded policy.
-func (uc *EvaluatePolicyUseCase) QuickEvaluate(input QuickEvaluateInput) EvaluatePolicyOutput {
+func (uc *EvaluatePolicyUseCase) QuickEvaluate(ctx context.Context, input QuickEvaluateInput) EvaluatePolicyOutput {
 	pol := input.Config.Policy
-	return uc.Execute(EvaluatePolicyInput{
+	return uc.Execute(ctx, EvaluatePolicyInput{
 		Assessment: input.Assessment,
 		Policy:     &pol,
 		Baseline:   nil,

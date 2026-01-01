@@ -301,3 +301,45 @@ func TestRegistry_ConcurrentAccess(t *testing.T) {
 	// Registry should have 10 engines
 	assert.Equal(t, 10, registry.Count())
 }
+
+func TestNewDefaultRegistry(t *testing.T) {
+	registry := NewDefaultRegistry()
+
+	assert.NotNil(t, registry)
+	// Default registry should have 4 engines: gosec, govulncheck, gitleaks, cyclonedx
+	assert.Equal(t, 4, registry.Count())
+
+	// Verify all expected engines are registered
+	_, hasGosec := registry.Get(ports.EngineGosec)
+	assert.True(t, hasGosec)
+
+	_, hasGovulncheck := registry.Get(ports.EngineGovulncheck)
+	assert.True(t, hasGovulncheck)
+
+	_, hasGitleaks := registry.Get(ports.EngineGitleaks)
+	assert.True(t, hasGitleaks)
+
+	_, hasCyclonedx := registry.Get(ports.EngineCycloneDX)
+	assert.True(t, hasCyclonedx)
+}
+
+func TestNewDefaultRegistry_EngineCapabilities(t *testing.T) {
+	registry := NewDefaultRegistry()
+
+	// Verify engines have correct capabilities
+	sastEngines := registry.GetByCapability(ports.CapabilitySAST)
+	assert.Len(t, sastEngines, 1)
+	assert.Equal(t, ports.EngineGosec, sastEngines[0].ID())
+
+	vulnEngines := registry.GetByCapability(ports.CapabilityVuln)
+	assert.Len(t, vulnEngines, 1)
+	assert.Equal(t, ports.EngineGovulncheck, vulnEngines[0].ID())
+
+	secretsEngines := registry.GetByCapability(ports.CapabilitySecrets)
+	assert.Len(t, secretsEngines, 1)
+	assert.Equal(t, ports.EngineGitleaks, secretsEngines[0].ID())
+
+	sbomEngines := registry.GetByCapability(ports.CapabilitySBOM)
+	assert.Len(t, sbomEngines, 1)
+	assert.Equal(t, ports.EngineCycloneDX, sbomEngines[0].ID())
+}

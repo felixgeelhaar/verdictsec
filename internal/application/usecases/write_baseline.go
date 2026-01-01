@@ -229,7 +229,7 @@ func (uc *WriteBaselineUseCase) Filter(input FilterInput) (FilterOutput, error) 
 		}
 
 		for _, fp := range filtered.Fingerprints() {
-			entry := filtered.GetEntry(nil) // We need fingerprint lookup
+			entry := filtered.GetEntryByFingerprint(fp)
 			if entry != nil && !engineSet[entry.EngineID] {
 				filtered.Remove(fp)
 			}

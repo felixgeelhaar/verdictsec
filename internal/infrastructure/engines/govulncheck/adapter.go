@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/felixgeelhaar/verdictsec/internal/application/ports"
-	"github.com/felixgeelhaar/verdictsec/internal/domain/finding"
 	"github.com/felixgeelhaar/verdictsec/pkg/pathutil"
 )
 
@@ -161,22 +160,6 @@ func (a *Adapter) detectVersion() string {
 	}
 
 	return "unknown"
-}
-
-// severityFromCVSS converts a CVSS score to domain severity.
-func severityFromCVSS(score float64) finding.Severity {
-	switch {
-	case score >= 9.0:
-		return finding.SeverityCritical
-	case score >= 7.0:
-		return finding.SeverityHigh
-	case score >= 4.0:
-		return finding.SeverityMedium
-	case score > 0:
-		return finding.SeverityLow
-	default:
-		return finding.SeverityUnknown
-	}
 }
 
 // Ensure Adapter implements ports.Engine

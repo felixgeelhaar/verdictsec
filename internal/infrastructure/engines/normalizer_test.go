@@ -133,3 +133,139 @@ func TestCompositeNormalizer_createBasicFinding(t *testing.T) {
 	assert.Equal(t, "basic.go", result.Location().File())
 	assert.Equal(t, 5, result.Location().Line())
 }
+
+func TestNewCompositeNormalizerWithConfig(t *testing.T) {
+	cfg := NormalizerConfig{
+		GosecMappings: map[string]finding.Severity{
+			"G101": finding.SeverityCritical,
+		},
+		GovulncheckMappings: map[string]finding.Severity{
+			"GO-2024-1234": finding.SeverityHigh,
+		},
+		GitleaksMappings: map[string]finding.Severity{
+			"aws-access-key": finding.SeverityCritical,
+		},
+	}
+
+	n := NewCompositeNormalizerWithConfig(cfg)
+
+	require.NotNil(t, n)
+	assert.NotNil(t, n.gosecNorm)
+	assert.NotNil(t, n.govulncheckNorm)
+	assert.NotNil(t, n.gitleaksNorm)
+}
+
+func TestNewCompositeNormalizerWithConfig_UsesCustomMappings(t *testing.T) {
+	cfg := NormalizerConfig{
+		GosecMappings: map[string]finding.Severity{
+			"G101": finding.SeverityLow, // Override default (usually CRITICAL)
+		},
+	}
+
+	n := NewCompositeNormalizerWithConfig(cfg)
+
+	raw := ports.RawFinding{
+		RuleID:    "G101",
+		Message:   "Potential hardcoded credentials",
+		File:      "main.go",
+		StartLine: 10,
+		Severity:  "HIGH",
+	}
+
+	result := n.Normalize(ports.EngineGosec, raw)
+
+	require.NotNil(t, result)
+	// Should use the custom mapping (LOW) not the default
+	assert.Equal(t, finding.SeverityLow, result.NormalizedSeverity())
+}
+
+func TestNewCompositeNormalizerFromPortsConfig(t *testing.T) {
+	cfg := ports.Config{
+		Engines: map[ports.EngineID]ports.EngineConfig{
+			ports.EngineGosec: {
+				Enabled: true,
+				SeverityMapping: map[string]finding.Severity{
+					"G401": finding.SeverityLow,
+				},
+			},
+			ports.EngineGovulncheck: {
+				Enabled: true,
+				SeverityMapping: map[string]finding.Severity{
+					"GO-2024-9999": finding.SeverityMedium,
+				},
+			},
+			ports.EngineGitleaks: {
+				Enabled: true,
+				SeverityMapping: map[string]finding.Severity{
+					"generic-api-key": finding.SeverityHigh,
+				},
+			},
+		},
+	}
+
+	n := NewCompositeNormalizerFromPortsConfig(cfg)
+
+	require.NotNil(t, n)
+	assert.NotNil(t, n.gosecNorm)
+	assert.NotNil(t, n.govulncheckNorm)
+	assert.NotNil(t, n.gitleaksNorm)
+}
+
+func TestNewCompositeNormalizerFromPortsConfig_UsesCustomMappings(t *testing.T) {
+	cfg := ports.Config{
+		Engines: map[ports.EngineID]ports.EngineConfig{
+			ports.EngineGosec: {
+				Enabled: true,
+				SeverityMapping: map[string]finding.Severity{
+					"G101": finding.SeverityMedium, // Override
+				},
+			},
+		},
+	}
+
+	n := NewCompositeNormalizerFromPortsConfig(cfg)
+
+	raw := ports.RawFinding{
+		RuleID:    "G101",
+		Message:   "Hardcoded credentials",
+		File:      "main.go",
+		StartLine: 10,
+		Severity:  "HIGH",
+	}
+
+	result := n.Normalize(ports.EngineGosec, raw)
+
+	require.NotNil(t, result)
+	assert.Equal(t, finding.SeverityMedium, result.NormalizedSeverity())
+}
+
+func TestNewCompositeNormalizerFromPortsConfig_EmptyConfig(t *testing.T) {
+	cfg := ports.Config{
+		Engines: map[ports.EngineID]ports.EngineConfig{},
+	}
+
+	n := NewCompositeNormalizerFromPortsConfig(cfg)
+
+	require.NotNil(t, n)
+	// Should still work with default normalizers
+	assert.NotNil(t, n.gosecNorm)
+	assert.NotNil(t, n.govulncheckNorm)
+	assert.NotNil(t, n.gitleaksNorm)
+}
+
+func TestNewCompositeNormalizerFromPortsConfig_NilSeverityMapping(t *testing.T) {
+	cfg := ports.Config{
+		Engines: map[ports.EngineID]ports.EngineConfig{
+			ports.EngineGosec: {
+				Enabled:         true,
+				SeverityMapping: nil, // Explicitly nil
+			},
+		},
+	}
+
+	n := NewCompositeNormalizerFromPortsConfig(cfg)
+
+	require.NotNil(t, n)
+	// Should still create normalizers with defaults
+	assert.NotNil(t, n.gosecNorm)
+}

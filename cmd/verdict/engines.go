@@ -177,7 +177,7 @@ func runSingleEngine(cmd *cobra.Command, args []string, engineIDs []ports.Engine
 		Baseline:   bl,
 		Mode:       mode,
 	}
-	evalOutput := evalUseCase.Execute(evalInput)
+	evalOutput := evalUseCase.Execute(ctx, evalInput)
 
 	// Write output
 	if err := writer.WriteAssessment(scanOutput.Assessment, evalOutput.Result); err != nil {

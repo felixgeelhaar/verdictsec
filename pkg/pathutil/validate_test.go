@@ -1,6 +1,7 @@
 package pathutil
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -125,6 +126,20 @@ func TestValidatePathInDir(t *testing.T) {
 	}
 }
 
+func TestValidatePath_SentinelErrors(t *testing.T) {
+	_, err := ValidatePath("")
+	assert.ErrorIs(t, err, ErrEmptyPath)
+
+	_, err = ValidatePath("test\x00.go")
+	assert.ErrorIs(t, err, ErrNullBytes)
+}
+
+func TestValidatePathInDir_ErrPathEscapesBase(t *testing.T) {
+	tmpDir := t.TempDir()
+	_, err := ValidatePathInDir(filepath.Join(tmpDir, "..", "escape.go"), tmpDir)
+	assert.ErrorIs(t, err, ErrPathEscapesBase)
+}
+
 func TestIsPathSafe(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -174,4 +189,57 @@ func TestIsPathSafe(t *testing.T) {
 			assert.Equal(t, tt.expect, result)
 		})
 	}
+}
+
+func TestValidatePath_ExistingPath(t *testing.T) {
+	// Create a real file to test symlink resolution
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "test.go")
+	require.NoError(t, writeTestFile(testFile))
+
+	result, err := ValidatePath(testFile)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result)
+	// Result should be the real path (symlinks resolved)
+	assert.Contains(t, result, "test.go")
+}
+
+func TestValidatePathInDir_ExistingFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "subdir", "test.go")
+	require.NoError(t, writeTestFile(testFile))
+
+	result, err := ValidatePathInDir(testFile, tmpDir)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result)
+	assert.Contains(t, result, "subdir")
+	assert.Contains(t, result, "test.go")
+}
+
+func TestValidatePathInDir_NonExistentFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	nonExistentFile := filepath.Join(tmpDir, "does-not-exist.go")
+
+	result, err := ValidatePathInDir(nonExistentFile, tmpDir)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result)
+}
+
+func TestValidatePathInDir_AbsolutePathResolution(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "test.go")
+	require.NoError(t, writeTestFile(testFile))
+
+	// Test with relative base and absolute path
+	result, err := ValidatePathInDir(testFile, tmpDir)
+	require.NoError(t, err)
+	assert.True(t, filepath.IsAbs(result))
+}
+
+func writeTestFile(path string) error {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+	return os.WriteFile(path, []byte("package main"), 0644)
 }

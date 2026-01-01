@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/felixgeelhaar/verdictsec/internal/application/ports"
@@ -311,19 +312,19 @@ func (c *Config) Validate() []error {
 	for i, supp := range c.Policy.Suppressions {
 		if supp.Fingerprint == "" {
 			errs = append(errs, &ValidationError{
-				Field:   "policy.suppressions[" + string(rune('0'+i)) + "].fingerprint",
+				Field:   fmt.Sprintf("policy.suppressions[%d].fingerprint", i),
 				Message: "fingerprint is required",
 			})
 		}
 		if supp.Reason == "" {
 			errs = append(errs, &ValidationError{
-				Field:   "policy.suppressions[" + string(rune('0'+i)) + "].reason",
+				Field:   fmt.Sprintf("policy.suppressions[%d].reason", i),
 				Message: "reason is required",
 			})
 		}
 		if supp.Owner == "" {
 			errs = append(errs, &ValidationError{
-				Field:   "policy.suppressions[" + string(rune('0'+i)) + "].owner",
+				Field:   fmt.Sprintf("policy.suppressions[%d].owner", i),
 				Message: "owner is required",
 			})
 		}

@@ -60,11 +60,19 @@ func (a *Assessment) StartedAt() time.Time { return a.startedAt }
 // CompletedAt returns when the assessment completed.
 func (a *Assessment) CompletedAt() time.Time { return a.completedAt }
 
-// EngineRuns returns all engine runs in this assessment.
-func (a *Assessment) EngineRuns() []*EngineRun { return a.engineRuns }
+// EngineRuns returns a defensive copy of all engine runs in this assessment.
+func (a *Assessment) EngineRuns() []*EngineRun {
+	result := make([]*EngineRun, len(a.engineRuns))
+	copy(result, a.engineRuns)
+	return result
+}
 
-// Findings returns all findings in this assessment.
-func (a *Assessment) Findings() []*finding.Finding { return a.findings }
+// Findings returns a defensive copy of all findings in this assessment.
+func (a *Assessment) Findings() []*finding.Finding {
+	result := make([]*finding.Finding, len(a.findings))
+	copy(result, a.findings)
+	return result
+}
 
 // Decision returns the final decision.
 func (a *Assessment) Decision() Decision { return a.decision }

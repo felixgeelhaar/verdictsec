@@ -16,6 +16,44 @@ func TestNewNormalizer(t *testing.T) {
 	assert.NotNil(t, normalizer.ruleOverrides)
 }
 
+func TestNewNormalizerWithOverrides(t *testing.T) {
+	customOverrides := map[string]finding.Severity{
+		"custom-rule":       finding.SeverityLow,
+		"aws-access-key-id": finding.SeverityMedium, // Override default
+	}
+
+	normalizer := NewNormalizerWithOverrides(customOverrides)
+
+	require.NotNil(t, normalizer)
+
+	// Custom rule should be added
+	raw := ports.RawFinding{
+		RuleID:   "custom-rule",
+		Severity: "HIGH",
+		File:     "test.go",
+	}
+	result := normalizer.Normalize(ports.EngineGitleaks, raw)
+	assert.Equal(t, finding.SeverityLow, result.NormalizedSeverity())
+
+	// Override should replace default
+	rawAws := ports.RawFinding{
+		RuleID:   "aws-access-key-id",
+		Severity: "CRITICAL",
+		File:     "test.go",
+	}
+	resultAws := normalizer.Normalize(ports.EngineGitleaks, rawAws)
+	assert.Equal(t, finding.SeverityMedium, resultAws.NormalizedSeverity())
+
+	// Other defaults should remain
+	rawPrivate := ports.RawFinding{
+		RuleID:   "private-key",
+		Severity: "HIGH",
+		File:     "test.go",
+	}
+	resultPrivate := normalizer.Normalize(ports.EngineGitleaks, rawPrivate)
+	assert.Equal(t, finding.SeverityCritical, resultPrivate.NormalizedSeverity())
+}
+
 func TestNormalizer_Normalize(t *testing.T) {
 	normalizer := NewNormalizer()
 	raw := ports.RawFinding{

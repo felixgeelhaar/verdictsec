@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -19,11 +20,17 @@ import (
 type Server struct {
 	mcpServer *mcp.Server
 	config    *config.Config
-	registry  *engines.Registry
+	registry  ports.EngineRegistry
 }
 
 // NewServer creates a new VerdictSec MCP server.
 func NewServer(cfg *config.Config) *Server {
+	return NewServerWithRegistry(cfg, engines.NewDefaultRegistry())
+}
+
+// NewServerWithRegistry creates a new VerdictSec MCP server with a custom registry.
+// This is primarily used for testing with mock engines.
+func NewServerWithRegistry(cfg *config.Config, registry ports.EngineRegistry) *Server {
 	srv := mcp.NewServer(mcp.ServerInfo{
 		Name:    "verdictsec",
 		Version: "1.0.0",
@@ -32,7 +39,7 @@ func NewServer(cfg *config.Config) *Server {
 	s := &Server{
 		mcpServer: srv,
 		config:    cfg,
-		registry:  engines.NewDefaultRegistry(),
+		registry:  registry,
 	}
 
 	s.registerTools()
@@ -413,7 +420,7 @@ func (s *Server) handlePolicyCheck(ctx context.Context, input PolicyCheckInput) 
 		Mode:       policy.ModeCI,
 	}
 
-	evalOutput := policyUseCase.Execute(evalInput)
+	evalOutput := policyUseCase.Execute(ctx, evalInput)
 
 	// Calculate violations and warnings from stats
 	violations := evalOutput.Stats.CriticalCount() + evalOutput.Stats.HighCount()
@@ -425,51 +432,83 @@ func (s *Server) handlePolicyCheck(ctx context.Context, input PolicyCheckInput) 
 		WarnThreshold: pol.Threshold.WarnOn.String(),
 		Violations:    violations,
 		Warnings:      warnings,
-		Messages:      make([]string, 0, len(evalOutput.Result.Reasons)),
-	}
-
-	for _, msg := range evalOutput.Result.Reasons {
-		result.Messages = append(result.Messages, msg)
+		Messages:      append([]string{}, evalOutput.Result.Reasons...),
 	}
 
 	return result, nil
 }
 
-func (s *Server) handleConfigResource(ctx context.Context, uri string, params map[string]string) (*mcp.ResourceContent, error) {
-	configJSON := fmt.Sprintf(`{
-  "version": "%s",
-  "policy": {
-    "fail_on": "%s",
-    "warn_on": "%s",
-    "baseline_mode": "%s"
-  },
-  "engines": {
-    "gosec": {"enabled": %t},
-    "govulncheck": {"enabled": %t},
-    "gitleaks": {"enabled": %t}
-  },
-  "baseline": {
-    "path": "%s"
-  }
-}`,
-		s.config.Version,
-		s.config.Policy.Threshold.FailOn,
-		s.config.Policy.Threshold.WarnOn,
-		s.config.Policy.BaselineMode,
-		s.config.Engines.Gosec.Enabled,
-		s.config.Engines.Govulncheck.Enabled,
-		s.config.Engines.Gitleaks.Enabled,
-		s.config.Baseline.Path,
-	)
+// configResourceData represents the config resource structure for JSON marshaling.
+type configResourceData struct {
+	Version  string               `json:"version"`
+	Policy   configPolicyData     `json:"policy"`
+	Engines  configEnginesData    `json:"engines"`
+	Baseline configBaselineData   `json:"baseline"`
+}
+
+type configPolicyData struct {
+	FailOn       string `json:"fail_on"`
+	WarnOn       string `json:"warn_on"`
+	BaselineMode string `json:"baseline_mode"`
+}
+
+type configEnginesData struct {
+	Gosec       configEngineStatus `json:"gosec"`
+	Govulncheck configEngineStatus `json:"govulncheck"`
+	Gitleaks    configEngineStatus `json:"gitleaks"`
+}
+
+type configEngineStatus struct {
+	Enabled bool `json:"enabled"`
+}
+
+type configBaselineData struct {
+	Path string `json:"path"`
+}
+
+func (s *Server) handleConfigResource(_ context.Context, uri string, _ map[string]string) (*mcp.ResourceContent, error) {
+	data := configResourceData{
+		Version: s.config.Version,
+		Policy: configPolicyData{
+			FailOn:       s.config.Policy.Threshold.FailOn,
+			WarnOn:       s.config.Policy.Threshold.WarnOn,
+			BaselineMode: s.config.Policy.BaselineMode,
+		},
+		Engines: configEnginesData{
+			Gosec:       configEngineStatus{Enabled: s.config.Engines.Gosec.Enabled},
+			Govulncheck: configEngineStatus{Enabled: s.config.Engines.Govulncheck.Enabled},
+			Gitleaks:    configEngineStatus{Enabled: s.config.Engines.Gitleaks.Enabled},
+		},
+		Baseline: configBaselineData{
+			Path: s.config.Baseline.Path,
+		},
+	}
+
+	jsonBytes, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal config: %w", err)
+	}
 
 	return &mcp.ResourceContent{
 		URI:      uri,
 		MimeType: "application/json",
-		Text:     configJSON,
+		Text:     string(jsonBytes),
 	}, nil
 }
 
-func (s *Server) handleBaselineResource(ctx context.Context, uri string, params map[string]string) (*mcp.ResourceContent, error) {
+// baselineResourceData represents the baseline resource structure for JSON marshaling.
+type baselineResourceData struct {
+	Entries []baselineEntryData `json:"entries"`
+	Count   int                 `json:"count"`
+}
+
+type baselineEntryData struct {
+	Fingerprint string `json:"fingerprint"`
+	RuleID      string `json:"rule_id"`
+	EngineID    string `json:"engine_id"`
+}
+
+func (s *Server) handleBaselineResource(_ context.Context, uri string, _ map[string]string) (*mcp.ResourceContent, error) {
 	blPath := s.config.Baseline.Path
 	if blPath == "" {
 		blPath = ".verdict/baseline.json"
@@ -478,32 +517,57 @@ func (s *Server) handleBaselineResource(ctx context.Context, uri string, params 
 	store := baseline.NewStoreWithPath(blPath)
 	bl, err := store.Load()
 	if err != nil {
+		emptyData := baselineResourceData{
+			Entries: []baselineEntryData{},
+			Count:   0,
+		}
+		jsonBytes, _ := json.Marshal(emptyData)
 		return &mcp.ResourceContent{
 			URI:      uri,
 			MimeType: "application/json",
-			Text:     `{"entries": [], "count": 0}`,
+			Text:     string(jsonBytes),
 		}, nil
 	}
 
-	entriesJSON := "[]"
-	if bl.Count() > 0 {
-		entries := make([]string, 0, bl.Count())
-		for _, entry := range bl.Entries {
-			entries = append(entries, fmt.Sprintf(`{"fingerprint": "%s", "rule_id": "%s", "engine_id": "%s"}`,
-				entry.Fingerprint, entry.RuleID, entry.EngineID))
-		}
-		entriesJSON = "[" + join(entries, ",") + "]"
+	entries := make([]baselineEntryData, 0, bl.Count())
+	for _, entry := range bl.GetEntries() {
+		entries = append(entries, baselineEntryData{
+			Fingerprint: entry.Fingerprint,
+			RuleID:      entry.RuleID,
+			EngineID:    entry.EngineID,
+		})
+	}
+
+	data := baselineResourceData{
+		Entries: entries,
+		Count:   bl.Count(),
+	}
+
+	jsonBytes, err := json.Marshal(data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal baseline: %w", err)
 	}
 
 	return &mcp.ResourceContent{
 		URI:      uri,
 		MimeType: "application/json",
-		Text:     fmt.Sprintf(`{"entries": %s, "count": %d}`, entriesJSON, bl.Count()),
+		Text:     string(jsonBytes),
 	}, nil
 }
 
-func (s *Server) handleEnginesResource(ctx context.Context, uri string, params map[string]string) (*mcp.ResourceContent, error) {
-	engineStatus := make([]string, 0, 4)
+// enginesResourceData represents the engines resource structure for JSON marshaling.
+type enginesResourceData struct {
+	Engines []engineStatusData `json:"engines"`
+}
+
+type engineStatusData struct {
+	ID        string `json:"id"`
+	Available bool   `json:"available"`
+	Enabled   bool   `json:"enabled"`
+}
+
+func (s *Server) handleEnginesResource(_ context.Context, uri string, _ map[string]string) (*mcp.ResourceContent, error) {
+	engineStatus := make([]engineStatusData, 0, 4)
 
 	// Check each engine
 	for _, id := range []ports.EngineID{ports.EngineGosec, ports.EngineGovulncheck, ports.EngineGitleaks, ports.EngineCycloneDX} {
@@ -521,14 +585,26 @@ func (s *Server) handleEnginesResource(ctx context.Context, uri string, params m
 			enabled = s.config.Engines.CycloneDX.Enabled
 		}
 
-		engineStatus = append(engineStatus, fmt.Sprintf(`{"id": "%s", "available": %t, "enabled": %t}`,
-			id, available, enabled))
+		engineStatus = append(engineStatus, engineStatusData{
+			ID:        string(id),
+			Available: available,
+			Enabled:   enabled,
+		})
+	}
+
+	data := enginesResourceData{
+		Engines: engineStatus,
+	}
+
+	jsonBytes, err := json.Marshal(data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal engines: %w", err)
 	}
 
 	return &mcp.ResourceContent{
 		URI:      uri,
 		MimeType: "application/json",
-		Text:     fmt.Sprintf(`{"engines": [%s]}`, join(engineStatus, ",")),
+		Text:     string(jsonBytes),
 	}, nil
 }
 
@@ -537,15 +613,4 @@ func getModeString(strict bool) string {
 		return "ci"
 	}
 	return "local"
-}
-
-func join(strs []string, sep string) string {
-	if len(strs) == 0 {
-		return ""
-	}
-	result := strs[0]
-	for i := 1; i < len(strs); i++ {
-		result += sep + strs[i]
-	}
-	return result
 }
