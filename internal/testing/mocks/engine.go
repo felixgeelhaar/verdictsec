@@ -13,6 +13,7 @@ type MockEngine struct {
 	VersionValue      string
 	CapabilitiesValue []ports.Capability
 	IsAvailableValue  bool
+	InfoValue         ports.EngineInfo
 	RunFunc           func(ctx context.Context, target ports.Target, config ports.EngineConfig) (ports.Evidence, []ports.RawFinding, error)
 }
 
@@ -44,6 +45,25 @@ func (m *MockEngine) Capabilities() []ports.Capability {
 // IsAvailable returns whether the engine is available.
 func (m *MockEngine) IsAvailable() bool {
 	return m.IsAvailableValue
+}
+
+// Info returns metadata about the engine.
+func (m *MockEngine) Info() ports.EngineInfo {
+	if m.InfoValue.ID == "" {
+		capability := ports.CapabilitySAST
+		if len(m.CapabilitiesValue) > 0 {
+			capability = m.CapabilitiesValue[0]
+		}
+		return ports.EngineInfo{
+			ID:          m.IDValue,
+			Name:        string(m.IDValue),
+			Description: "Mock engine for testing",
+			InstallCmd:  "go install mock@latest",
+			Homepage:    "https://example.com",
+			Capability:  capability,
+		}
+	}
+	return m.InfoValue
 }
 
 // Run executes the mock scan.

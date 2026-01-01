@@ -59,7 +59,7 @@ func TestAdapter_Run_BinaryNotFound(t *testing.T) {
 	_, _, err := adapter.Run(context.Background(), target, config)
 
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "gitleaks binary not found")
+	assert.Contains(t, err.Error(), "Gitleaks not found")
 }
 
 func TestAdapter_BuildArgs_Default(t *testing.T) {
@@ -119,4 +119,17 @@ func TestAdapter_BuildArgs_WithConfig(t *testing.T) {
 
 func TestAdapter_ImplementsEngineInterface(t *testing.T) {
 	var _ ports.Engine = (*Adapter)(nil)
+}
+
+func TestAdapter_Info(t *testing.T) {
+	adapter := NewAdapter()
+
+	info := adapter.Info()
+
+	assert.Equal(t, ports.EngineGitleaks, info.ID)
+	assert.Equal(t, "Gitleaks", info.Name)
+	assert.NotEmpty(t, info.Description)
+	assert.Contains(t, info.InstallCmd, "github.com/gitleaks/gitleaks")
+	assert.Equal(t, "https://github.com/gitleaks/gitleaks", info.Homepage)
+	assert.Equal(t, ports.CapabilitySecrets, info.Capability)
 }

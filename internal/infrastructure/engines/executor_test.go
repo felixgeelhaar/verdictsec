@@ -38,6 +38,21 @@ func (m *mockEngineForExecutor) IsAvailable() bool {
 	return m.available
 }
 
+func (m *mockEngineForExecutor) Info() ports.EngineInfo {
+	capability := ports.CapabilitySAST
+	if len(m.capabilities) > 0 {
+		capability = m.capabilities[0]
+	}
+	return ports.EngineInfo{
+		ID:          m.id,
+		Name:        string(m.id),
+		Description: "Mock engine for executor testing",
+		InstallCmd:  "go install mock@latest",
+		Homepage:    "https://example.com",
+		Capability:  capability,
+	}
+}
+
 func (m *mockEngineForExecutor) Run(ctx context.Context, target ports.Target, config ports.EngineConfig) (ports.Evidence, []ports.RawFinding, error) {
 	// Simulate delay
 	if m.delay > 0 {

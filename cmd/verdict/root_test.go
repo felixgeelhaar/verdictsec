@@ -635,6 +635,8 @@ engines:
     enabled: false
   cyclonedx-gomod:
     enabled: false
+  syft:
+    enabled: false
 `)
 	require.NoError(t, os.WriteFile(configPath, content, 0644))
 
@@ -670,6 +672,8 @@ engines:
   gitleaks:
     enabled: false
   cyclonedx-gomod:
+    enabled: false
+  syft:
     enabled: false
 `)
 	require.NoError(t, os.WriteFile(configPath, content, 0644))
@@ -707,6 +711,8 @@ engines:
     enabled: false
   cyclonedx-gomod:
     enabled: false
+  syft:
+    enabled: false
 `)
 	require.NoError(t, os.WriteFile(configPath, content, 0644))
 
@@ -742,6 +748,8 @@ engines:
   gitleaks:
     enabled: false
   cyclonedx-gomod:
+    enabled: false
+  syft:
     enabled: false
 `)
 	require.NoError(t, os.WriteFile(configPath, content, 0644))

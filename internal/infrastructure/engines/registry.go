@@ -78,6 +78,59 @@ func (r *Registry) Available() []ports.Engine {
 	return result
 }
 
+// Unavailable returns engines that are NOT installed or accessible.
+func (r *Registry) Unavailable() []ports.Engine {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var result []ports.Engine
+	for _, engine := range r.engines {
+		if !engine.IsAvailable() {
+			result = append(result, engine)
+		}
+	}
+	return result
+}
+
+// EngineStatus represents the status of an engine for diagnostics.
+type EngineStatus struct {
+	Info      ports.EngineInfo
+	Available bool
+	Version   string // Empty if not available
+	Enabled   bool   // From config
+}
+
+// Status returns the status of all registered engines.
+func (r *Registry) Status(cfg ports.Config) []EngineStatus {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	result := make([]EngineStatus, 0, len(r.engines))
+	for _, engine := range r.engines {
+		info := engine.Info()
+		available := engine.IsAvailable()
+
+		version := ""
+		if available {
+			version = engine.Version()
+		}
+
+		// Check if engine is enabled in config
+		enabled := true // Default to enabled if not in config
+		if engineCfg, ok := cfg.Engines[engine.ID()]; ok {
+			enabled = engineCfg.Enabled
+		}
+
+		result = append(result, EngineStatus{
+			Info:      info,
+			Available: available,
+			Version:   version,
+			Enabled:   enabled,
+		})
+	}
+	return result
+}
+
 // Count returns the total number of registered engines.
 func (r *Registry) Count() int {
 	r.mu.RLock()

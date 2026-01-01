@@ -59,7 +59,7 @@ func TestAdapter_Run_BinaryNotFound(t *testing.T) {
 	_, _, err := adapter.Run(context.Background(), target, config)
 
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "govulncheck binary not found")
+	assert.Contains(t, err.Error(), "Govulncheck not found")
 }
 
 func TestAdapter_BuildArgs_Default(t *testing.T) {
@@ -137,4 +137,17 @@ func TestAdapter_BuildArgs_EmptySettings(t *testing.T) {
 	assert.Contains(t, args, "./...")
 	// Without mode setting, only basic args
 	assert.Len(t, args, 2)
+}
+
+func TestAdapter_Info(t *testing.T) {
+	adapter := NewAdapter()
+
+	info := adapter.Info()
+
+	assert.Equal(t, ports.EngineGovulncheck, info.ID)
+	assert.Equal(t, "Govulncheck", info.Name)
+	assert.NotEmpty(t, info.Description)
+	assert.Contains(t, info.InstallCmd, "golang.org/x/vuln/cmd/govulncheck")
+	assert.Equal(t, "https://pkg.go.dev/golang.org/x/vuln/cmd/govulncheck", info.Homepage)
+	assert.Equal(t, ports.CapabilityVuln, info.Capability)
 }

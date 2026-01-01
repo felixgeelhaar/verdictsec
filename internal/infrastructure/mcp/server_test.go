@@ -308,6 +308,8 @@ func TestServer_RunScan_NoEngines(t *testing.T) {
 	cfg.Engines.Gosec.Enabled = false
 	cfg.Engines.Govulncheck.Enabled = false
 	cfg.Engines.Gitleaks.Enabled = false
+	cfg.Engines.CycloneDX.Enabled = false
+	cfg.Engines.Syft.Enabled = false
 
 	server := NewServer(cfg)
 
@@ -326,6 +328,8 @@ func TestServer_RunScan_WithSpecifiedEngines(t *testing.T) {
 	cfg.Engines.Gosec.Enabled = false
 	cfg.Engines.Govulncheck.Enabled = false
 	cfg.Engines.Gitleaks.Enabled = false
+	cfg.Engines.CycloneDX.Enabled = false
+	cfg.Engines.Syft.Enabled = false
 
 	server := NewServer(cfg)
 
@@ -346,6 +350,8 @@ func TestServer_RunScan_StrictModeError(t *testing.T) {
 	cfg.Engines.Gosec.Enabled = false
 	cfg.Engines.Govulncheck.Enabled = false
 	cfg.Engines.Gitleaks.Enabled = false
+	cfg.Engines.CycloneDX.Enabled = false
+	cfg.Engines.Syft.Enabled = false
 
 	server := NewServer(cfg)
 
@@ -365,6 +371,8 @@ func TestServer_HandleBaselineAdd_Error(t *testing.T) {
 	cfg.Engines.Gosec.Enabled = false
 	cfg.Engines.Govulncheck.Enabled = false
 	cfg.Engines.Gitleaks.Enabled = false
+	cfg.Engines.CycloneDX.Enabled = false
+	cfg.Engines.Syft.Enabled = false
 
 	server := NewServer(cfg)
 
@@ -387,6 +395,8 @@ func TestServer_HandlePolicyCheck_Error(t *testing.T) {
 	cfg.Engines.Gosec.Enabled = false
 	cfg.Engines.Govulncheck.Enabled = false
 	cfg.Engines.Gitleaks.Enabled = false
+	cfg.Engines.CycloneDX.Enabled = false
+	cfg.Engines.Syft.Enabled = false
 
 	server := NewServer(cfg)
 
@@ -407,6 +417,8 @@ func TestServer_RunScan_DefaultPath(t *testing.T) {
 	cfg.Engines.Gosec.Enabled = false
 	cfg.Engines.Govulncheck.Enabled = false
 	cfg.Engines.Gitleaks.Enabled = false
+	cfg.Engines.CycloneDX.Enabled = false
+	cfg.Engines.Syft.Enabled = false
 
 	server := NewServer(cfg)
 
@@ -425,6 +437,8 @@ func TestServer_RunScan_InputEnginesParsing(t *testing.T) {
 	cfg.Engines.Gosec.Enabled = false
 	cfg.Engines.Govulncheck.Enabled = false
 	cfg.Engines.Gitleaks.Enabled = false
+	cfg.Engines.CycloneDX.Enabled = false
+	cfg.Engines.Syft.Enabled = false
 
 	server := NewServer(cfg)
 

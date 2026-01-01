@@ -58,6 +58,18 @@ func (a *Adapter) IsAvailable() bool {
 	return err == nil
 }
 
+// Info returns metadata about the engine for user-facing display.
+func (a *Adapter) Info() ports.EngineInfo {
+	return ports.EngineInfo{
+		ID:          ports.EngineGitleaks,
+		Name:        "Gitleaks",
+		Description: "Secrets detector - finds hardcoded credentials and API keys",
+		InstallCmd:  "go install github.com/gitleaks/gitleaks/v8@latest",
+		Homepage:    "https://github.com/gitleaks/gitleaks",
+		Capability:  ports.CapabilitySecrets,
+	}
+}
+
 // Run executes gitleaks and returns raw findings.
 func (a *Adapter) Run(ctx context.Context, target ports.Target, config ports.EngineConfig) (ports.Evidence, []ports.RawFinding, error) {
 	evidence := ports.Evidence{
@@ -67,7 +79,9 @@ func (a *Adapter) Run(ctx context.Context, target ports.Target, config ports.Eng
 	}
 
 	if !a.IsAvailable() {
-		return evidence, nil, fmt.Errorf("gitleaks binary not found: %s", a.binaryPath)
+		info := a.Info()
+		return evidence, nil, fmt.Errorf("%s not found. Install with:\n  %s\n\nMore info: %s",
+			info.Name, info.InstallCmd, info.Homepage)
 	}
 
 	// Validate target path to prevent command injection

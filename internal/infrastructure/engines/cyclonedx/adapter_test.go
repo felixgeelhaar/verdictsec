@@ -58,7 +58,7 @@ func TestAdapter_Run_BinaryNotFound(t *testing.T) {
 	_, _, err := adapter.Run(context.Background(), target, config)
 
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "cyclonedx-gomod binary not found")
+	assert.Contains(t, err.Error(), "CycloneDX Go Mod not found")
 }
 
 func TestAdapter_BuildArgs_Default(t *testing.T) {
@@ -148,7 +148,7 @@ func TestAdapter_GenerateSBOM_BinaryNotFound(t *testing.T) {
 	_, err := adapter.GenerateSBOM(context.Background(), target, config)
 
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "cyclonedx-gomod binary not found")
+	assert.Contains(t, err.Error(), "CycloneDX Go Mod not found")
 }
 
 func TestAdapter_Version_Cached(t *testing.T) {
@@ -182,4 +182,17 @@ func TestAdapter_BuildArgs_AllOptions(t *testing.T) {
 	assert.Contains(t, args, "-test")
 	assert.Contains(t, args, "-std")
 	assert.Contains(t, args, "-mod=/custom/go.mod")
+}
+
+func TestAdapter_Info(t *testing.T) {
+	adapter := NewAdapter()
+
+	info := adapter.Info()
+
+	assert.Equal(t, ports.EngineCycloneDX, info.ID)
+	assert.Equal(t, "CycloneDX Go Mod", info.Name)
+	assert.NotEmpty(t, info.Description)
+	assert.Contains(t, info.InstallCmd, "github.com/CycloneDX/cyclonedx-gomod")
+	assert.Equal(t, "https://github.com/CycloneDX/cyclonedx-gomod", info.Homepage)
+	assert.Equal(t, ports.CapabilitySBOM, info.Capability)
 }

@@ -55,6 +55,18 @@ func (a *Adapter) IsAvailable() bool {
 	return err == nil
 }
 
+// Info returns metadata about the engine for user-facing display.
+func (a *Adapter) Info() ports.EngineInfo {
+	return ports.EngineInfo{
+		ID:          ports.EngineGovulncheck,
+		Name:        "Govulncheck",
+		Description: "Go vulnerability scanner - finds known vulnerabilities in dependencies",
+		InstallCmd:  "go install golang.org/x/vuln/cmd/govulncheck@latest",
+		Homepage:    "https://pkg.go.dev/golang.org/x/vuln/cmd/govulncheck",
+		Capability:  ports.CapabilityVuln,
+	}
+}
+
 // Run executes govulncheck and returns raw findings.
 func (a *Adapter) Run(ctx context.Context, target ports.Target, config ports.EngineConfig) (ports.Evidence, []ports.RawFinding, error) {
 	evidence := ports.Evidence{
@@ -64,7 +76,9 @@ func (a *Adapter) Run(ctx context.Context, target ports.Target, config ports.Eng
 	}
 
 	if !a.IsAvailable() {
-		return evidence, nil, fmt.Errorf("govulncheck binary not found: %s", a.binaryPath)
+		info := a.Info()
+		return evidence, nil, fmt.Errorf("%s not found. Install with:\n  %s\n\nMore info: %s",
+			info.Name, info.InstallCmd, info.Homepage)
 	}
 
 	// Validate target path to prevent command injection
@@ -138,24 +152,21 @@ func (a *Adapter) detectVersion() string {
 	}
 
 	// Parse version from output
+	// govulncheck outputs: "Go: go1.x\nScanner: govulncheck@v1.1.4\nDB: ..."
 	versionStr := strings.TrimSpace(string(output))
 	lines := strings.Split(versionStr, "\n")
-	for _, line := range lines {
-		if strings.Contains(line, "govulncheck") || strings.Contains(line, "v") {
-			parts := strings.Fields(line)
-			for _, part := range parts {
-				if strings.HasPrefix(part, "v") {
-					return part
-				}
-			}
-		}
-	}
 
-	// Try to find version pattern
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
-		if len(line) > 0 && (line[0] == 'v' || (line[0] >= '0' && line[0] <= '9')) {
-			return line
+		// Look for "Scanner: govulncheck@v1.1.4" format
+		if strings.HasPrefix(line, "Scanner:") {
+			// Extract version from "govulncheck@v1.1.4"
+			if idx := strings.Index(line, "@"); idx != -1 {
+				version := strings.TrimSpace(line[idx+1:])
+				if version != "" {
+					return version
+				}
+			}
 		}
 	}
 

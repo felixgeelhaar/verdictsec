@@ -56,6 +56,18 @@ func (a *Adapter) IsAvailable() bool {
 	return err == nil
 }
 
+// Info returns metadata about the engine for user-facing display.
+func (a *Adapter) Info() ports.EngineInfo {
+	return ports.EngineInfo{
+		ID:          ports.EngineGosec,
+		Name:        "Gosec",
+		Description: "Go security checker - finds security vulnerabilities in Go code",
+		InstallCmd:  "go install github.com/securego/gosec/v2/cmd/gosec@latest",
+		Homepage:    "https://github.com/securego/gosec",
+		Capability:  ports.CapabilitySAST,
+	}
+}
+
 // Run executes gosec and returns raw findings.
 func (a *Adapter) Run(ctx context.Context, target ports.Target, config ports.EngineConfig) (ports.Evidence, []ports.RawFinding, error) {
 	evidence := ports.Evidence{
@@ -65,7 +77,9 @@ func (a *Adapter) Run(ctx context.Context, target ports.Target, config ports.Eng
 	}
 
 	if !a.IsAvailable() {
-		return evidence, nil, fmt.Errorf("gosec binary not found: %s", a.binaryPath)
+		info := a.Info()
+		return evidence, nil, fmt.Errorf("%s not found. Install with:\n  %s\n\nMore info: %s",
+			info.Name, info.InstallCmd, info.Homepage)
 	}
 
 	// Validate target path to prevent command injection
@@ -149,21 +163,17 @@ func (a *Adapter) detectVersion() string {
 		return "unknown"
 	}
 
-	// Parse version from output (e.g., "Version: 2.18.0")
+	// Parse version from output
+	// gosec outputs: "Version: dev\nGit tag: \nBuild date: " or "Version: 2.18.0\n..."
 	versionStr := strings.TrimSpace(string(output))
-	if strings.HasPrefix(versionStr, "Version: ") {
-		return strings.TrimPrefix(versionStr, "Version: ")
-	}
-
-	// Try to extract version from different formats
 	lines := strings.Split(versionStr, "\n")
+
 	for _, line := range lines {
-		if strings.Contains(line, "version") || strings.Contains(line, "Version") {
-			parts := strings.Fields(line)
-			for _, part := range parts {
-				if len(part) > 0 && (part[0] >= '0' && part[0] <= '9') {
-					return strings.TrimSpace(part)
-				}
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "Version:") {
+			version := strings.TrimSpace(strings.TrimPrefix(line, "Version:"))
+			if version != "" {
+				return version
 			}
 		}
 	}

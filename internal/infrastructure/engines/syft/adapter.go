@@ -1,4 +1,4 @@
-package cyclonedx
+package syft
 
 import (
 	"bytes"
@@ -11,21 +11,21 @@ import (
 	"github.com/felixgeelhaar/verdictsec/pkg/pathutil"
 )
 
-// Adapter implements the Engine interface for cyclonedx-gomod.
-// This adapter generates SBOMs rather than finding security issues.
+// Adapter implements the Engine interface for syft.
+// Syft is an artifact-level SBOM generator for containers, binaries, and multi-ecosystem projects.
 type Adapter struct {
 	binaryPath string
 	version    string
 }
 
-// NewAdapter creates a new cyclonedx-gomod adapter.
+// NewAdapter creates a new syft adapter.
 func NewAdapter() *Adapter {
 	return &Adapter{
-		binaryPath: "cyclonedx-gomod",
+		binaryPath: "syft",
 	}
 }
 
-// NewAdapterWithPath creates a new cyclonedx-gomod adapter with a custom binary path.
+// NewAdapterWithPath creates a new syft adapter with a custom binary path.
 func NewAdapterWithPath(path string) *Adapter {
 	return &Adapter{
 		binaryPath: path,
@@ -34,10 +34,10 @@ func NewAdapterWithPath(path string) *Adapter {
 
 // ID returns the engine identifier.
 func (a *Adapter) ID() ports.EngineID {
-	return ports.EngineCycloneDX
+	return ports.EngineSyft
 }
 
-// Version returns the cyclonedx-gomod version.
+// Version returns the syft version.
 func (a *Adapter) Version() string {
 	if a.version == "" {
 		a.version = a.detectVersion()
@@ -50,7 +50,7 @@ func (a *Adapter) Capabilities() []ports.Capability {
 	return []ports.Capability{ports.CapabilitySBOM}
 }
 
-// IsAvailable checks if cyclonedx-gomod is installed and accessible.
+// IsAvailable checks if syft is installed and accessible.
 func (a *Adapter) IsAvailable() bool {
 	_, err := exec.LookPath(a.binaryPath)
 	return err == nil
@@ -59,16 +59,16 @@ func (a *Adapter) IsAvailable() bool {
 // Info returns metadata about the engine for user-facing display.
 func (a *Adapter) Info() ports.EngineInfo {
 	return ports.EngineInfo{
-		ID:          ports.EngineCycloneDX,
-		Name:        "CycloneDX Go Mod",
-		Description: "SBOM generator - creates software bill of materials for Go modules",
-		InstallCmd:  "go install github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@latest",
-		Homepage:    "https://github.com/CycloneDX/cyclonedx-gomod",
+		ID:          ports.EngineSyft,
+		Name:        "Syft",
+		Description: "Artifact SBOM generator - creates software bill of materials from containers, binaries, and filesystems",
+		InstallCmd:  "go install github.com/anchore/syft/cmd/syft@latest",
+		Homepage:    "https://github.com/anchore/syft",
 		Capability:  ports.CapabilitySBOM,
 	}
 }
 
-// Run executes cyclonedx-gomod and returns the SBOM.
+// Run executes syft and returns the SBOM.
 // Note: SBOM generation doesn't produce findings, but the raw output contains the SBOM.
 func (a *Adapter) Run(ctx context.Context, target ports.Target, config ports.EngineConfig) (ports.Evidence, []ports.RawFinding, error) {
 	evidence := ports.Evidence{
@@ -92,7 +92,7 @@ func (a *Adapter) Run(ctx context.Context, target ports.Target, config ports.Eng
 	// Build command arguments
 	args := a.buildArgs(target, config)
 
-	// Execute cyclonedx-gomod - path is validated above
+	// Execute syft - path is validated above
 	cmd := exec.CommandContext(ctx, a.binaryPath, args...) // #nosec G204 - binary path is controlled, target path is validated
 	cmd.Dir = cleanPath
 
@@ -104,14 +104,14 @@ func (a *Adapter) Run(ctx context.Context, target ports.Target, config ports.Eng
 	evidence.RawOutput = stdout.Bytes()
 
 	if err != nil {
-		return evidence, nil, fmt.Errorf("cyclonedx-gomod failed: %s", stderr.String())
+		return evidence, nil, fmt.Errorf("syft failed: %s", stderr.String())
 	}
 
-	// Parse the SBOM to extract component information
+	// Parse the SBOM to extract artifact information
 	parser := NewParser()
 	rawFindings, err := parser.Parse(stdout.Bytes())
 	if err != nil {
-		return evidence, nil, fmt.Errorf("failed to parse cyclonedx-gomod output: %w", err)
+		return evidence, nil, fmt.Errorf("failed to parse syft output: %w", err)
 	}
 
 	return evidence, rawFindings, nil
@@ -126,54 +126,92 @@ func (a *Adapter) GenerateSBOM(ctx context.Context, target ports.Target, config 
 	return evidence.RawOutput, nil
 }
 
-// buildArgs constructs the cyclonedx-gomod command line arguments.
+// buildArgs constructs the syft command line arguments.
 func (a *Adapter) buildArgs(target ports.Target, config ports.EngineConfig) []string {
+	// Default to scanning current directory
+	scanTarget := "dir:."
+
+	// Check for specific source type from settings
+	if sourceType, ok := config.Settings["source_type"]; ok {
+		switch sourceType {
+		case "image":
+			// Container image scanning
+			if imageName, ok := config.Settings["image"]; ok {
+				scanTarget = imageName
+			}
+		case "file":
+			// File/binary scanning
+			if filePath, ok := config.Settings["file"]; ok {
+				scanTarget = "file:" + filePath
+			}
+		case "dir":
+			// Directory scanning (default)
+			scanTarget = "dir:."
+		}
+	}
+
 	args := []string{
-		"mod",
-		"-json",
+		scanTarget,
+		"-o", "json",
+		"--quiet",
 	}
 
-	// Output type: module (default), app, or std
-	if outputType, ok := config.Settings["type"]; ok {
-		args = append(args, fmt.Sprintf("-type=%s", outputType))
+	// Output format override (cyclonedx-json, spdx-json, etc.)
+	if outputFormat, ok := config.Settings["output_format"]; ok {
+		args[2] = outputFormat
 	}
 
-	// Include test dependencies
-	if includeTest, ok := config.Settings["include_test"]; ok && includeTest == "true" {
-		args = append(args, "-test")
+	// Exclude patterns
+	for _, exclusion := range target.Exclusions {
+		args = append(args, "--exclude", exclusion)
 	}
 
-	// Include standard library
-	if includeStd, ok := config.Settings["include_std"]; ok && includeStd == "true" {
-		args = append(args, "-std")
+	// Scope: all-layers (for containers) or squashed
+	if scope, ok := config.Settings["scope"]; ok {
+		args = append(args, "--scope", scope)
 	}
 
-	// Specify go.mod path if not in target root
-	if gomodPath, ok := config.Settings["gomod"]; ok {
-		args = append(args, fmt.Sprintf("-mod=%s", gomodPath))
+	// Config file
+	if configFile, ok := config.Settings["config"]; ok {
+		args = append(args, "--config", configFile)
 	}
 
 	return args
 }
 
-// detectVersion gets the cyclonedx-gomod version.
+// detectVersion gets the syft version.
 func (a *Adapter) detectVersion() string {
-	cmd := exec.Command(a.binaryPath, "-version") // #nosec G204 - binary path is controlled by adapter
+	cmd := exec.Command(a.binaryPath, "version") // #nosec G204 - binary path is controlled by adapter
 	output, err := cmd.Output()
 	if err != nil {
 		return "unknown"
 	}
 
 	// Parse version from output
+	// Syft outputs: "syft 0.x.x" or similar format
 	versionStr := strings.TrimSpace(string(output))
 	lines := strings.Split(versionStr, "\n")
 	for _, line := range lines {
-		if strings.Contains(line, "version") || strings.HasPrefix(line, "v") {
+		line = strings.TrimSpace(line)
+		// Look for version line
+		if strings.HasPrefix(line, "Version:") {
 			parts := strings.Fields(line)
-			for _, part := range parts {
-				if strings.HasPrefix(part, "v") || (len(part) > 0 && part[0] >= '0' && part[0] <= '9') {
-					return strings.TrimSpace(part)
-				}
+			if len(parts) >= 2 {
+				return parts[1]
+			}
+		}
+		// Some versions just output "syft x.y.z"
+		if strings.HasPrefix(line, "syft") {
+			parts := strings.Fields(line)
+			if len(parts) >= 2 {
+				return parts[1]
+			}
+		}
+		// Try to find a version number
+		parts := strings.Fields(line)
+		for _, part := range parts {
+			if strings.HasPrefix(part, "v") || (len(part) > 0 && part[0] >= '0' && part[0] <= '9') {
+				return strings.TrimSpace(part)
 			}
 		}
 	}

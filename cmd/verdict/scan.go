@@ -111,6 +111,10 @@ func runScan(cmd *cobra.Command, args []string) error {
 	// Create engine registry
 	registry := engines.NewDefaultRegistry()
 
+	// Warn about missing engines
+	portsCfg := cfg.ToPortsConfig()
+	WarnMissingEngines(registry, portsCfg)
+
 	// Create composite normalizer
 	normalizer := engines.NewCompositeNormalizer()
 

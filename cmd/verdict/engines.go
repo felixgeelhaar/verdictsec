@@ -125,6 +125,17 @@ func runSingleEngine(cmd *cobra.Command, args []string, engineIDs []ports.Engine
 	// Create engine registry
 	registry := engines.NewDefaultRegistry()
 
+	// Warn about missing engines (for the specific engine being used)
+	portsCfg := cfg.ToPortsConfig()
+	for _, engineID := range engineIDs {
+		if engine, ok := registry.Get(engineID); ok && !engine.IsAvailable() {
+			info := engine.Info()
+			fmt.Fprintf(os.Stderr, "⚠ Warning: Engine %s is not installed\n", info.Name)
+			fmt.Fprintf(os.Stderr, "  Install with: %s\n\n", info.InstallCmd)
+		}
+	}
+	_ = portsCfg // Silence unused variable warning
+
 	// Create composite normalizer
 	normalizer := engines.NewCompositeNormalizer()
 

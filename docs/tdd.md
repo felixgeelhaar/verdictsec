@@ -283,15 +283,20 @@ Run(context, target, config) → Evidence + RawFindings
 
 Engines v1:
 
-gosec
+gosec - Static Application Security Testing (SAST)
+  Detects insecure coding patterns in Go source code
 
-govulncheck
+govulncheck - Dependency Vulnerability Scanning
+  Identifies known vulnerabilities in Go modules with reachability analysis
 
-gitleaks
+gitleaks - Secrets Detection
+  Scans for leaked credentials and sensitive data in source files
 
-cyclonedx-gomod
+cyclonedx-gomod - Module-level SBOM Generation
+  Generates SBOM from go.mod/go.sum for dependency transparency
 
-syft
+syft - Artifact-level SBOM Generation
+  Generates SBOM from containers, binaries, and multi-ecosystem artifacts
 
 Engines are:
 

@@ -15,6 +15,7 @@ type mockEngine struct {
 	version      string
 	capabilities []ports.Capability
 	available    bool
+	info         ports.EngineInfo
 }
 
 func (m *mockEngine) ID() ports.EngineID {
@@ -31,6 +32,20 @@ func (m *mockEngine) Capabilities() []ports.Capability {
 
 func (m *mockEngine) IsAvailable() bool {
 	return m.available
+}
+
+func (m *mockEngine) Info() ports.EngineInfo {
+	if m.info.ID == "" {
+		return ports.EngineInfo{
+			ID:          m.id,
+			Name:        string(m.id),
+			Description: "Mock engine for testing",
+			InstallCmd:  "go install mock@latest",
+			Homepage:    "https://example.com",
+			Capability:  ports.CapabilitySAST,
+		}
+	}
+	return m.info
 }
 
 func (m *mockEngine) Run(ctx context.Context, target ports.Target, config ports.EngineConfig) (ports.Evidence, []ports.RawFinding, error) {
@@ -306,8 +321,8 @@ func TestNewDefaultRegistry(t *testing.T) {
 	registry := NewDefaultRegistry()
 
 	assert.NotNil(t, registry)
-	// Default registry should have 4 engines: gosec, govulncheck, gitleaks, cyclonedx
-	assert.Equal(t, 4, registry.Count())
+	// Default registry should have 5 engines: gosec, govulncheck, gitleaks, cyclonedx, syft
+	assert.Equal(t, 5, registry.Count())
 
 	// Verify all expected engines are registered
 	_, hasGosec := registry.Get(ports.EngineGosec)
@@ -321,6 +336,9 @@ func TestNewDefaultRegistry(t *testing.T) {
 
 	_, hasCyclonedx := registry.Get(ports.EngineCycloneDX)
 	assert.True(t, hasCyclonedx)
+
+	_, hasSyft := registry.Get(ports.EngineSyft)
+	assert.True(t, hasSyft)
 }
 
 func TestNewDefaultRegistry_EngineCapabilities(t *testing.T) {
@@ -339,7 +357,138 @@ func TestNewDefaultRegistry_EngineCapabilities(t *testing.T) {
 	assert.Len(t, secretsEngines, 1)
 	assert.Equal(t, ports.EngineGitleaks, secretsEngines[0].ID())
 
+	// Two SBOM engines: cyclonedx (module-level) and syft (artifact-level)
 	sbomEngines := registry.GetByCapability(ports.CapabilitySBOM)
-	assert.Len(t, sbomEngines, 1)
-	assert.Equal(t, ports.EngineCycloneDX, sbomEngines[0].ID())
+	assert.Len(t, sbomEngines, 2)
+
+	sbomEngineIDs := make([]ports.EngineID, len(sbomEngines))
+	for i, e := range sbomEngines {
+		sbomEngineIDs[i] = e.ID()
+	}
+	assert.Contains(t, sbomEngineIDs, ports.EngineCycloneDX)
+	assert.Contains(t, sbomEngineIDs, ports.EngineSyft)
+}
+
+func TestRegistry_Unavailable(t *testing.T) {
+	registry := NewRegistry()
+	registry.Register(&mockEngine{id: ports.EngineGosec, available: true})
+	registry.Register(&mockEngine{id: ports.EngineGovulncheck, available: false})
+	registry.Register(&mockEngine{id: ports.EngineGitleaks, available: false})
+
+	unavailable := registry.Unavailable()
+
+	assert.Len(t, unavailable, 2)
+}
+
+func TestRegistry_Unavailable_AllAvailable(t *testing.T) {
+	registry := NewRegistry()
+	registry.Register(&mockEngine{id: ports.EngineGosec, available: true})
+	registry.Register(&mockEngine{id: ports.EngineGovulncheck, available: true})
+
+	unavailable := registry.Unavailable()
+
+	assert.Empty(t, unavailable)
+}
+
+func TestRegistry_Status(t *testing.T) {
+	registry := NewRegistry()
+	registry.Register(&mockEngine{
+		id:           ports.EngineGosec,
+		version:      "2.18.0",
+		available:    true,
+		capabilities: []ports.Capability{ports.CapabilitySAST},
+	})
+	registry.Register(&mockEngine{
+		id:           ports.EngineGovulncheck,
+		version:      "1.0.0",
+		available:    false,
+		capabilities: []ports.Capability{ports.CapabilityVuln},
+	})
+
+	cfg := ports.Config{
+		Engines: map[ports.EngineID]ports.EngineConfig{
+			ports.EngineGosec:       {Enabled: true},
+			ports.EngineGovulncheck: {Enabled: false},
+		},
+	}
+
+	statuses := registry.Status(cfg)
+
+	assert.Len(t, statuses, 2)
+
+	// Find gosec status
+	var gosecStatus, govulnStatus *EngineStatus
+	for i := range statuses {
+		if statuses[i].Info.ID == ports.EngineGosec {
+			gosecStatus = &statuses[i]
+		}
+		if statuses[i].Info.ID == ports.EngineGovulncheck {
+			govulnStatus = &statuses[i]
+		}
+	}
+
+	require.NotNil(t, gosecStatus)
+	assert.True(t, gosecStatus.Available)
+	assert.Equal(t, "2.18.0", gosecStatus.Version)
+	assert.True(t, gosecStatus.Enabled)
+
+	require.NotNil(t, govulnStatus)
+	assert.False(t, govulnStatus.Available)
+	assert.Empty(t, govulnStatus.Version) // Version empty when not available
+	assert.False(t, govulnStatus.Enabled)
+}
+
+func TestRegistry_Status_DefaultEnabled(t *testing.T) {
+	registry := NewRegistry()
+	registry.Register(&mockEngine{
+		id:        ports.EngineGosec,
+		available: true,
+	})
+
+	// Empty config - engine should default to enabled
+	cfg := ports.Config{
+		Engines: map[ports.EngineID]ports.EngineConfig{},
+	}
+
+	statuses := registry.Status(cfg)
+
+	assert.Len(t, statuses, 1)
+	assert.True(t, statuses[0].Enabled) // Default to enabled
+}
+
+func TestMockEngine_Info(t *testing.T) {
+	engine := &mockEngine{
+		id:           ports.EngineGosec,
+		capabilities: []ports.Capability{ports.CapabilitySAST},
+	}
+
+	info := engine.Info()
+
+	assert.Equal(t, ports.EngineGosec, info.ID)
+	assert.Equal(t, "gosec", info.Name)
+	assert.Equal(t, ports.CapabilitySAST, info.Capability)
+	assert.NotEmpty(t, info.InstallCmd)
+	assert.NotEmpty(t, info.Homepage)
+}
+
+func TestMockEngine_Info_CustomInfo(t *testing.T) {
+	customInfo := ports.EngineInfo{
+		ID:          ports.EngineGosec,
+		Name:        "Custom Gosec",
+		Description: "Custom description",
+		InstallCmd:  "custom install",
+		Homepage:    "https://custom.example.com",
+		Capability:  ports.CapabilitySAST,
+	}
+
+	engine := &mockEngine{
+		id:   ports.EngineGosec,
+		info: customInfo,
+	}
+
+	info := engine.Info()
+
+	assert.Equal(t, "Custom Gosec", info.Name)
+	assert.Equal(t, "Custom description", info.Description)
+	assert.Equal(t, "custom install", info.InstallCmd)
 }

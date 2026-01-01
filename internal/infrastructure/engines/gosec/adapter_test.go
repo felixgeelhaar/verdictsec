@@ -77,7 +77,7 @@ func TestAdapter_Run_BinaryNotFound(t *testing.T) {
 	_, _, err := adapter.Run(context.Background(), target, config.Engines[ports.EngineGosec])
 
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "gosec binary not found")
+	assert.Contains(t, err.Error(), "Gosec not found")
 }
 
 func TestAdapter_BuildArgs_Default(t *testing.T) {
@@ -182,4 +182,17 @@ func TestAdapter_Run_ContextCancellation(t *testing.T) {
 
 	// Should error due to context cancellation
 	assert.Error(t, err)
+}
+
+func TestAdapter_Info(t *testing.T) {
+	adapter := NewAdapter()
+
+	info := adapter.Info()
+
+	assert.Equal(t, ports.EngineGosec, info.ID)
+	assert.Equal(t, "Gosec", info.Name)
+	assert.NotEmpty(t, info.Description)
+	assert.Contains(t, info.InstallCmd, "github.com/securego/gosec")
+	assert.Equal(t, "https://github.com/securego/gosec", info.Homepage)
+	assert.Equal(t, ports.CapabilitySAST, info.Capability)
 }

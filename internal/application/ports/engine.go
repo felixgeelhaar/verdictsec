@@ -62,6 +62,16 @@ func DefaultEngineConfig() EngineConfig {
 	}
 }
 
+// EngineInfo provides metadata about an engine for user-facing display.
+type EngineInfo struct {
+	ID          EngineID   // Unique identifier
+	Name        string     // Human-readable name (e.g., "Gosec")
+	Description string     // What this engine does
+	InstallCmd  string     // Installation command (e.g., "go install ...")
+	Homepage    string     // Documentation URL
+	Capability  Capability // Primary capability
+}
+
 // Evidence captures metadata about an engine run.
 type Evidence struct {
 	EngineID      EngineID
@@ -100,6 +110,9 @@ type Engine interface {
 
 	// IsAvailable checks if the engine binary is installed and accessible.
 	IsAvailable() bool
+
+	// Info returns metadata about the engine for user-facing display.
+	Info() EngineInfo
 
 	// Run executes the scan and returns raw findings.
 	// The findings will be normalized by the application layer.

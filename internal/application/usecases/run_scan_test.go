@@ -36,6 +36,21 @@ func (m *mockEngine) IsAvailable() bool {
 	return m.available
 }
 
+func (m *mockEngine) Info() ports.EngineInfo {
+	capability := ports.CapabilitySAST
+	if len(m.capabilities) > 0 {
+		capability = m.capabilities[0]
+	}
+	return ports.EngineInfo{
+		ID:          m.id,
+		Name:        string(m.id),
+		Description: "Mock engine for testing",
+		InstallCmd:  "go install mock@latest",
+		Homepage:    "https://example.com",
+		Capability:  capability,
+	}
+}
+
 func (m *mockEngine) Run(ctx context.Context, target ports.Target, config ports.EngineConfig) (ports.Evidence, []ports.RawFinding, error) {
 	if m.shouldFail {
 		return ports.Evidence{}, nil, errors.New("engine failed")

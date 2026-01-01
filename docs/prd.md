@@ -146,11 +146,15 @@ Strong redaction and rotation guidance
 
 Supply Chain (SBOM)
 
-Module-level SBOM (dependencies)
+Module-level SBOM (dependencies) → cyclonedx-gomod
+  - Analyzes go.mod/go.sum for Go module dependencies
+  - Best for source code security assessments
 
-Artifact-level SBOM (what is shipped)
+Artifact-level SBOM (what is shipped) → syft
+  - Scans containers, binaries, and multi-ecosystem artifacts
+  - Best for release and deployment security
 
-CycloneDX / SPDX support
+CycloneDX / SPDX format support
 
 4.2 Decision & Governance
 
