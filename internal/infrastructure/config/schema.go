@@ -16,6 +16,7 @@ type Config struct {
 	Engines  EnginesConfig  `yaml:"engines" json:"engines"`
 	Output   OutputConfig   `yaml:"output" json:"output"`
 	Baseline BaselineConfig `yaml:"baseline" json:"baseline"`
+	MCP      MCPConfig      `yaml:"mcp" json:"mcp"`
 }
 
 // PolicyConfig defines policy settings for scan results.
@@ -70,6 +71,20 @@ type BaselineConfig struct {
 	Path   string `yaml:"path" json:"path"`
 	Strict bool   `yaml:"strict" json:"strict"`
 }
+
+// MCPConfig defines MCP server settings for output limits.
+type MCPConfig struct {
+	MaxFindings      int    `yaml:"max_findings" json:"max_findings"`           // Max findings to return (0 = unlimited)
+	MaxOutputBytes   int    `yaml:"max_output_bytes" json:"max_output_bytes"`   // Approximate byte limit (0 = unlimited)
+	TruncateStrategy string `yaml:"truncate_strategy" json:"truncate_strategy"` // priority, newest, oldest
+}
+
+// TruncateStrategy constants for MCP output truncation.
+const (
+	TruncateStrategyPriority = "priority" // By severity: CRITICAL > HIGH > MEDIUM > LOW
+	TruncateStrategyNewest   = "newest"   // Most recent findings first
+	TruncateStrategyOldest   = "oldest"   // Oldest findings first
+)
 
 // DefaultConfig returns the default configuration.
 func DefaultConfig() *Config {
@@ -131,6 +146,11 @@ func DefaultConfig() *Config {
 		Baseline: BaselineConfig{
 			Path:   ".verdict/baseline.json",
 			Strict: false,
+		},
+		MCP: MCPConfig{
+			MaxFindings:      50,    // Default: return up to 50 findings
+			MaxOutputBytes:   50000, // Default: ~50KB output limit
+			TruncateStrategy: TruncateStrategyPriority,
 		},
 	}
 }
@@ -243,6 +263,33 @@ func (c *Config) IsBaselineStrict() bool {
 // IsBaselineEnabled returns true if baseline checking is enabled.
 func (c *Config) IsBaselineEnabled() bool {
 	return c.Policy.BaselineMode != "off"
+}
+
+// GetMCPConfig returns the MCP configuration with defaults applied.
+// Note: Use -1 to explicitly disable truncation (MaxFindings or MaxOutputBytes).
+func (c *Config) GetMCPConfig() MCPConfig {
+	cfg := c.MCP
+	// Apply defaults only if not explicitly set
+	// Negative values mean "disabled", 0 means "use default"
+	if cfg.MaxFindings == 0 {
+		cfg.MaxFindings = 50
+	} else if cfg.MaxFindings < 0 {
+		cfg.MaxFindings = 0 // Normalize to 0 for the truncation service
+	}
+	if cfg.MaxOutputBytes == 0 {
+		cfg.MaxOutputBytes = 50000
+	} else if cfg.MaxOutputBytes < 0 {
+		cfg.MaxOutputBytes = 0 // Normalize to 0 for the truncation service
+	}
+	if cfg.TruncateStrategy == "" {
+		cfg.TruncateStrategy = TruncateStrategyPriority
+	}
+	return cfg
+}
+
+// IsMCPTruncationEnabled returns true if MCP output truncation is enabled.
+func (c *Config) IsMCPTruncationEnabled() bool {
+	return c.MCP.MaxFindings > 0 || c.MCP.MaxOutputBytes > 0
 }
 
 // EngineConfig returns the config for a specific engine.
@@ -365,6 +412,32 @@ func (c *Config) Validate() []error {
 		errs = append(errs, &ValidationError{
 			Field:   "output.verbosity",
 			Message: "must be one of: quiet, normal, verbose",
+		})
+	}
+
+	// Validate MCP config
+	if c.MCP.MaxFindings < 0 {
+		errs = append(errs, &ValidationError{
+			Field:   "mcp.max_findings",
+			Message: "must be non-negative",
+		})
+	}
+	if c.MCP.MaxOutputBytes < 0 {
+		errs = append(errs, &ValidationError{
+			Field:   "mcp.max_output_bytes",
+			Message: "must be non-negative",
+		})
+	}
+	validStrategies := map[string]bool{
+		TruncateStrategyPriority: true,
+		TruncateStrategyNewest:   true,
+		TruncateStrategyOldest:   true,
+		"":                       true, // Empty is OK, defaults will be applied
+	}
+	if !validStrategies[c.MCP.TruncateStrategy] {
+		errs = append(errs, &ValidationError{
+			Field:   "mcp.truncate_strategy",
+			Message: "must be one of: priority, newest, oldest",
 		})
 	}
 

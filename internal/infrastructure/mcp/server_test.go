@@ -815,3 +815,166 @@ func TestServer_HandlePolicyCheck_WithMockEngine_Fail(t *testing.T) {
 	assert.Equal(t, "FAIL", result.Decision)
 	assert.Equal(t, 1, result.Violations)
 }
+
+// Truncation Tests
+
+func TestServer_RunScan_NoTruncation(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.Engines.Gosec.Enabled = true
+	// Default max_findings is 50, we only have 3 findings
+
+	registry := mocks.NewMockRegistry()
+	mockEngine := mocks.NewMockEngine(ports.EngineGosec)
+	mockEngine.CapabilitiesValue = []ports.Capability{ports.CapabilitySAST}
+	mockEngine.WithFindings([]ports.RawFinding{
+		{RuleID: "G401", Message: "Weak crypto", Severity: "HIGH", File: "crypto.go", StartLine: 10},
+		{RuleID: "G104", Message: "Errors unhandled", Severity: "LOW", File: "main.go", StartLine: 20},
+		{RuleID: "G101", Message: "Hardcoded credentials", Severity: "CRITICAL", File: "config.go", StartLine: 30},
+	})
+	registry.Register(mockEngine)
+
+	server := NewServerWithRegistry(cfg, registry, "test")
+
+	input := ScanInput{Path: ".", Engines: []string{"gosec"}}
+	result, err := server.runScan(context.Background(), input, nil)
+
+	require.NoError(t, err)
+	assert.False(t, result.Truncated, "should not be truncated")
+	assert.Equal(t, 3, result.TotalCount)
+	assert.Equal(t, 3, result.ShownCount)
+	assert.Len(t, result.Findings, 3)
+	assert.Nil(t, result.TruncationInfo)
+}
+
+func TestServer_RunScan_WithTruncation(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.Engines.Gosec.Enabled = true
+	// Set very low max_findings to trigger truncation
+	cfg.MCP.MaxFindings = 2
+	cfg.MCP.TruncateStrategy = config.TruncateStrategyPriority
+
+	registry := mocks.NewMockRegistry()
+	mockEngine := mocks.NewMockEngine(ports.EngineGosec)
+	mockEngine.CapabilitiesValue = []ports.Capability{ports.CapabilitySAST}
+	// Create 5 findings - gosec normalizer maps these to HIGH by default
+	// so all will have HIGH severity after normalization
+	mockEngine.WithFindings([]ports.RawFinding{
+		{RuleID: "G401", Message: "Issue 1", Severity: "HIGH", File: "a.go", StartLine: 10},
+		{RuleID: "G401", Message: "Issue 2", Severity: "HIGH", File: "b.go", StartLine: 20},
+		{RuleID: "G401", Message: "Issue 3", Severity: "HIGH", File: "c.go", StartLine: 30},
+		{RuleID: "G401", Message: "Issue 4", Severity: "HIGH", File: "d.go", StartLine: 40},
+		{RuleID: "G401", Message: "Issue 5", Severity: "HIGH", File: "e.go", StartLine: 50},
+	})
+	registry.Register(mockEngine)
+
+	server := NewServerWithRegistry(cfg, registry, "test")
+
+	input := ScanInput{Path: ".", Engines: []string{"gosec"}}
+	result, err := server.runScan(context.Background(), input, nil)
+
+	require.NoError(t, err)
+	assert.True(t, result.Truncated, "should be truncated")
+	assert.Equal(t, 5, result.TotalCount)
+	assert.Equal(t, 2, result.ShownCount)
+	assert.Len(t, result.Findings, 2)
+
+	// Verify truncation info
+	require.NotNil(t, result.TruncationInfo)
+	assert.Equal(t, 5, result.TruncationInfo.TotalFindings)
+	assert.Equal(t, 2, result.TruncationInfo.ShownFindings)
+	assert.Equal(t, "priority", result.TruncationInfo.Strategy)
+	assert.Contains(t, result.TruncationInfo.Message, "2 of 5")
+
+	// Verify hidden counts - 3 HIGH findings were cut
+	assert.Equal(t, 3, result.TruncationInfo.HiddenBySeverity["HIGH"])
+}
+
+func TestServer_RunScan_TruncationPreservesTotalCounts(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.Engines.Gosec.Enabled = true
+	cfg.MCP.MaxFindings = 1
+
+	registry := mocks.NewMockRegistry()
+	mockEngine := mocks.NewMockEngine(ports.EngineGosec)
+	mockEngine.CapabilitiesValue = []ports.Capability{ports.CapabilitySAST}
+	// Use rule IDs that gosec normalizer maps to specific severities:
+	// G101 -> CRITICAL, G401 -> HIGH, G404 -> MEDIUM, G104 -> LOW
+	mockEngine.WithFindings([]ports.RawFinding{
+		{RuleID: "G101", Message: "Critical", Severity: "CRITICAL", File: "a.go", StartLine: 10},
+		{RuleID: "G401", Message: "High", Severity: "HIGH", File: "b.go", StartLine: 20},
+		{RuleID: "G404", Message: "Medium", Severity: "MEDIUM", File: "c.go", StartLine: 30},
+		{RuleID: "G104", Message: "Low", Severity: "LOW", File: "d.go", StartLine: 40},
+	})
+	registry.Register(mockEngine)
+
+	server := NewServerWithRegistry(cfg, registry, "test")
+
+	input := ScanInput{Path: ".", Engines: []string{"gosec"}}
+	result, err := server.runScan(context.Background(), input, nil)
+
+	require.NoError(t, err)
+
+	// Severity counts should reflect ALL findings, not just shown ones
+	assert.Equal(t, 1, result.CriticalCount)
+	assert.Equal(t, 1, result.HighCount)
+	assert.Equal(t, 1, result.MediumCount)
+	assert.Equal(t, 1, result.LowCount)
+
+	// But only 1 finding should be shown
+	assert.Len(t, result.Findings, 1)
+	assert.Equal(t, 4, result.TotalCount)
+	assert.Equal(t, 1, result.ShownCount)
+}
+
+func TestServer_RunScan_TruncationDisabled(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.Engines.Gosec.Enabled = true
+	// Set max_findings to -1 to disable truncation (0 = use default of 50)
+	cfg.MCP.MaxFindings = -1
+
+	registry := mocks.NewMockRegistry()
+	mockEngine := mocks.NewMockEngine(ports.EngineGosec)
+	mockEngine.CapabilitiesValue = []ports.Capability{ports.CapabilitySAST}
+	// Create many findings
+	findings := make([]ports.RawFinding, 100)
+	for i := 0; i < 100; i++ {
+		findings[i] = ports.RawFinding{
+			RuleID:    "G401",
+			Message:   "Finding",
+			Severity:  "LOW",
+			File:      "file.go",
+			StartLine: i + 1,
+		}
+	}
+	mockEngine.WithFindings(findings)
+	registry.Register(mockEngine)
+
+	server := NewServerWithRegistry(cfg, registry, "test")
+
+	input := ScanInput{Path: ".", Engines: []string{"gosec"}}
+	result, err := server.runScan(context.Background(), input, nil)
+
+	require.NoError(t, err)
+	assert.False(t, result.Truncated)
+	assert.Equal(t, 100, result.TotalCount)
+	assert.Equal(t, 100, result.ShownCount)
+	assert.Len(t, result.Findings, 100)
+	assert.Nil(t, result.TruncationInfo)
+}
+
+func TestScanResult_TruncationInfo_Structure(t *testing.T) {
+	info := &TruncationInfo{
+		TotalFindings:    150,
+		ShownFindings:    50,
+		HiddenBySeverity: map[string]int{"MEDIUM": 80, "LOW": 20},
+		Strategy:         "priority",
+		Message:          "Showing 50 of 150 findings (sorted by priority)",
+	}
+
+	assert.Equal(t, 150, info.TotalFindings)
+	assert.Equal(t, 50, info.ShownFindings)
+	assert.Equal(t, 80, info.HiddenBySeverity["MEDIUM"])
+	assert.Equal(t, 20, info.HiddenBySeverity["LOW"])
+	assert.Equal(t, "priority", info.Strategy)
+	assert.Contains(t, info.Message, "50 of 150")
+}

@@ -10,6 +10,7 @@ import (
 	"github.com/felixgeelhaar/verdictsec/internal/application/ports"
 	"github.com/felixgeelhaar/verdictsec/internal/application/usecases"
 	"github.com/felixgeelhaar/verdictsec/internal/domain/policy"
+	"github.com/felixgeelhaar/verdictsec/internal/domain/services"
 	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/baseline"
 	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/config"
 	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/engines"
@@ -18,9 +19,10 @@ import (
 
 // Server wraps the MCP server with VerdictSec functionality.
 type Server struct {
-	mcpServer *mcp.Server
-	config    *config.Config
-	registry  ports.EngineRegistry
+	mcpServer  *mcp.Server
+	config     *config.Config
+	registry   ports.EngineRegistry
+	truncation *services.TruncationService
 }
 
 // NewServer creates a new VerdictSec MCP server.
@@ -44,9 +46,10 @@ func NewServerWithRegistry(cfg *config.Config, registry ports.EngineRegistry, ve
 	})
 
 	s := &Server{
-		mcpServer: srv,
-		config:    cfg,
-		registry:  registry,
+		mcpServer:  srv,
+		config:     cfg,
+		registry:   registry,
+		truncation: services.NewTruncationService(),
 	}
 
 	s.registerTools()
@@ -134,14 +137,26 @@ type ScanInput struct {
 
 // ScanResult represents the result of a scan operation.
 type ScanResult struct {
-	Status       string         `json:"status"`
-	TotalCount   int            `json:"total_count"`
-	CriticalCount int           `json:"critical_count"`
-	HighCount    int            `json:"high_count"`
-	MediumCount  int            `json:"medium_count"`
-	LowCount     int            `json:"low_count"`
-	Findings     []FindingInfo  `json:"findings"`
-	Duration     string         `json:"duration"`
+	Status         string          `json:"status"`
+	TotalCount     int             `json:"total_count"`
+	ShownCount     int             `json:"shown_count"`
+	Truncated      bool            `json:"truncated"`
+	CriticalCount  int             `json:"critical_count"`
+	HighCount      int             `json:"high_count"`
+	MediumCount    int             `json:"medium_count"`
+	LowCount       int             `json:"low_count"`
+	Findings       []FindingInfo   `json:"findings"`
+	Duration       string          `json:"duration"`
+	TruncationInfo *TruncationInfo `json:"truncation_info,omitempty"`
+}
+
+// TruncationInfo provides details about truncated results.
+type TruncationInfo struct {
+	TotalFindings    int            `json:"total_findings"`
+	ShownFindings    int            `json:"shown_findings"`
+	HiddenBySeverity map[string]int `json:"hidden_by_severity"`
+	Strategy         string         `json:"strategy"`
+	Message          string         `json:"message"`
 }
 
 // FindingInfo represents a single finding in scan results.
@@ -226,28 +241,47 @@ func (s *Server) runScan(ctx context.Context, input ScanInput, forceEngines []po
 		return nil, fmt.Errorf("scan failed: %w", err)
 	}
 
-	// Convert findings to result format
-	findings := output.Assessment.Findings()
-	result := &ScanResult{
-		Status:     "completed",
-		TotalCount: len(findings),
-		Duration:   time.Since(start).String(),
-		Findings:   make([]FindingInfo, 0, len(findings)),
-	}
+	// Get all findings
+	allFindings := output.Assessment.Findings()
 
-	for _, f := range findings {
-		// Count by severity
+	// Apply truncation based on MCP config
+	mcpCfg := s.config.GetMCPConfig()
+	truncResult := s.truncation.Truncate(allFindings, services.TruncationConfig{
+		MaxFindings: mcpCfg.MaxFindings,
+		Strategy:    services.TruncateStrategy(mcpCfg.TruncateStrategy),
+	})
+
+	// Count severities from ALL findings (for accurate totals)
+	var criticalCount, highCount, mediumCount, lowCount int
+	for _, f := range allFindings {
 		switch f.EffectiveSeverity().String() {
 		case "CRITICAL":
-			result.CriticalCount++
+			criticalCount++
 		case "HIGH":
-			result.HighCount++
+			highCount++
 		case "MEDIUM":
-			result.MediumCount++
+			mediumCount++
 		case "LOW":
-			result.LowCount++
+			lowCount++
 		}
+	}
 
+	// Build result with truncated findings
+	result := &ScanResult{
+		Status:        "completed",
+		TotalCount:   truncResult.TotalCount,
+		ShownCount:   truncResult.ShownCount,
+		Truncated:    truncResult.Truncated,
+		CriticalCount: criticalCount,
+		HighCount:    highCount,
+		MediumCount:  mediumCount,
+		LowCount:     lowCount,
+		Duration:     time.Since(start).String(),
+		Findings:     make([]FindingInfo, 0, len(truncResult.Findings)),
+	}
+
+	// Convert truncated findings to FindingInfo
+	for _, f := range truncResult.Findings {
 		result.Findings = append(result.Findings, FindingInfo{
 			ID:          f.ID(),
 			Engine:      f.EngineID(),
@@ -258,6 +292,25 @@ func (s *Server) runScan(ctx context.Context, input ScanInput, forceEngines []po
 			Line:        f.Location().Line(),
 			Fingerprint: f.Fingerprint().String(),
 		})
+	}
+
+	// Add truncation info if truncation occurred
+	if truncResult.Truncated {
+		hiddenBySeverity := make(map[string]int)
+		for sev, count := range truncResult.Summary.HiddenBySeverity {
+			if count > 0 {
+				hiddenBySeverity[sev.String()] = count
+			}
+		}
+
+		result.TruncationInfo = &TruncationInfo{
+			TotalFindings:    truncResult.TotalCount,
+			ShownFindings:    truncResult.ShownCount,
+			HiddenBySeverity: hiddenBySeverity,
+			Strategy:         mcpCfg.TruncateStrategy,
+			Message: fmt.Sprintf("Showing %d of %d findings (sorted by %s)",
+				truncResult.ShownCount, truncResult.TotalCount, mcpCfg.TruncateStrategy),
+		}
 	}
 
 	return result, nil
