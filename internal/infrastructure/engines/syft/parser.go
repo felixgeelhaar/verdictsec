@@ -27,7 +27,7 @@ type Artifact struct {
 	Locations []Location        `json:"locations"`
 	Licenses  []License         `json:"licenses,omitempty"`
 	Language  string            `json:"language,omitempty"`
-	CPEs      []string          `json:"cpes,omitempty"`
+	CPEs      []CPE             `json:"cpes,omitempty"`
 	PURL      string            `json:"purl,omitempty"`
 	Metadata  map[string]any    `json:"metadata,omitempty"`
 }
@@ -44,6 +44,13 @@ type License struct {
 	Value          string `json:"value"`
 	SPDXExpression string `json:"spdxExpression,omitempty"`
 	Type           string `json:"type,omitempty"`
+}
+
+// CPE represents a Common Platform Enumeration identifier.
+// Syft 1.39.0+ returns CPEs as objects with cpe and source fields.
+type CPE struct {
+	CPE    string `json:"cpe"`
+	Source string `json:"source,omitempty"`
 }
 
 // Source represents what was scanned.
@@ -154,7 +161,7 @@ func (p *Parser) artifactToRawFinding(artifact Artifact, source Source) ports.Ra
 
 	// Extract CPE if available
 	if len(artifact.CPEs) > 0 {
-		metadata["cpe"] = artifact.CPEs[0]
+		metadata["cpe"] = artifact.CPEs[0].CPE
 	}
 
 	// Determine file location

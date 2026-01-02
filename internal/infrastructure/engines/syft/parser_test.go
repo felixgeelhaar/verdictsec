@@ -50,7 +50,7 @@ func TestParser_Parse_ValidOutput(t *testing.T) {
 				Licenses: []License{
 					{Value: "MIT", SPDXExpression: "MIT"},
 				},
-				CPEs: []string{"cpe:2.3:a:example:pkg:1.2.3:*:*:*:*:*:*:*"},
+				CPEs: []CPE{{CPE: "cpe:2.3:a:example:pkg:1.2.3:*:*:*:*:*:*:*", Source: "syft-generated"}},
 			},
 		},
 		Source: Source{
@@ -296,7 +296,7 @@ func TestParser_Parse_WithCPE(t *testing.T) {
 				Name:    "openssl",
 				Version: "1.1.1",
 				Type:    "deb",
-				CPEs:    []string{"cpe:2.3:a:openssl:openssl:1.1.1:*:*:*:*:*:*:*"},
+				CPEs:    []CPE{{CPE: "cpe:2.3:a:openssl:openssl:1.1.1:*:*:*:*:*:*:*", Source: "syft-generated"}},
 			},
 		},
 		Source: Source{Type: "image"},
