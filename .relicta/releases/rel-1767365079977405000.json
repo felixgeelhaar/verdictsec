@@ -1,0 +1,78 @@
+{
+  "id": "rel-1767365079977405000",
+  "state": "planned",
+  "branch": "main",
+  "repository_path": "",
+  "repository_name": "verdicta",
+  "tag_name": "",
+  "plan": {
+    "current_version": "0.6.1",
+    "next_version": "0.7.0",
+    "release_type": "minor",
+    "commit_count": 5,
+    "changeset_id": "cs-1767365079944982000",
+    "changeset": {
+      "id": "cs-1767365079944982000",
+      "from_ref": "v0.6.1",
+      "to_ref": "",
+      "commits": [
+        {
+          "hash": "bd0a8e9eeea7ccb1c2d4db9ea23acc8d893ca0d9",
+          "type": "feat",
+          "scope": "mcp",
+          "subject": "filter baselined findings from scan results",
+          "body": "MCP tools now filter out baselined findings and report them separately:\n\n- Added BaselinedCount to ScanResult and PolicyCheckResult structs\n- runScan() loads baseline and excludes baselined findings before\n  truncation, ensuring only active findings are returned\n- handlePolicyCheck() filters baselined findings when evaluating\n  violations, allowing PASS when all findings are baselined\n- Added loadBaseline() helper method for consistent baseline loading\n\nThis prevents AI assistants from repeatedly being shown already-accepted\nfindings, keeping responses focused on new issues that need attention.\n\nCloses #7",
+          "author": "Felix Geelhaar",
+          "author_email": "felix@felixgeelhaar.de",
+          "date": "2026-01-02T15:42:01+01:00",
+          "raw_message": "feat(mcp): filter baselined findings from scan results\n\nMCP tools now filter out baselined findings and report them separately:\n\n- Added BaselinedCount to ScanResult and PolicyCheckResult structs\n- runScan() loads baseline and excludes baselined findings before\n  truncation, ensuring only active findings are returned\n- handlePolicyCheck() filters baselined findings when evaluating\n  violations, allowing PASS when all findings are baselined\n- Added loadBaseline() helper method for consistent baseline loading\n\nThis prevents AI assistants from repeatedly being shown already-accepted\nfindings, keeping responses focused on new issues that need attention.\n\nCloses #7\n"
+        },
+        {
+          "hash": "bbbfccedec908c54070b7d8b63d5ec9740a83687",
+          "type": "feat",
+          "scope": "mcp",
+          "subject": "add configurable output limits for MCP server",
+          "body": "Implements GitHub issue #6: MCP token/output limits.\n\nFeatures:\n- Add MCPConfig to schema with MaxFindings, MaxOutputBytes,\n  and TruncateStrategy options\n- Create TruncationService domain service for output limiting\n- Support three strategies: priority (by severity), newest, oldest\n- Preserve total finding counts while truncating returned list\n- Add TruncationInfo to ScanResult for AI assistant context\n\nConfig options:\n- max_findings: 50 (default), -1 to disable\n- max_output_bytes: 50000 (default), -1 to disable\n- truncate_strategy: priority|newest|oldest\n\nThe truncation service uses stable sort to maintain order within\nsame severity levels and provides detailed summary of hidden\nfindings by severity.",
+          "author": "Felix Geelhaar",
+          "author_email": "felix@felixgeelhaar.de",
+          "date": "2026-01-02T15:29:03+01:00",
+          "raw_message": "feat(mcp): add configurable output limits for MCP server\n\nImplements GitHub issue #6: MCP token/output limits.\n\nFeatures:\n- Add MCPConfig to schema with MaxFindings, MaxOutputBytes,\n  and TruncateStrategy options\n- Create TruncationService domain service for output limiting\n- Support three strategies: priority (by severity), newest, oldest\n- Preserve total finding counts while truncating returned list\n- Add TruncationInfo to ScanResult for AI assistant context\n\nConfig options:\n- max_findings: 50 (default), -1 to disable\n- max_output_bytes: 50000 (default), -1 to disable\n- truncate_strategy: priority|newest|oldest\n\nThe truncation service uses stable sort to maintain order within\nsame severity levels and provides detailed summary of hidden\nfindings by severity.\n"
+        },
+        {
+          "hash": "755b61d765df41df76abc2cf6f588dff8d807a0c",
+          "type": "fix",
+          "subject": "pass CLI version to MCP server for consistency",
+          "body": "The MCP server now receives the CLI version at initialization,\nensuring the MCP server reports the same version as the CLI.\n\nCloses #5",
+          "author": "Felix Geelhaar",
+          "author_email": "felix@felixgeelhaar.de",
+          "date": "2026-01-02T15:10:35+01:00",
+          "raw_message": "fix: pass CLI version to MCP server for consistency\n\nThe MCP server now receives the CLI version at initialization,\nensuring the MCP server reports the same version as the CLI.\n\nCloses #5\n"
+        },
+        {
+          "hash": "d5e93477ee044b96d0be42af1c3b61ca48388016",
+          "type": "ci",
+          "subject": "fix security scan - remove gitleaks, add permissions",
+          "body": "- Remove gitleaks install (requires Go 1.25+)\n- Add security-events permission for SARIF upload",
+          "author": "Felix Geelhaar",
+          "author_email": "felix@felixgeelhaar.de",
+          "date": "2026-01-02T15:07:06+01:00",
+          "raw_message": "ci: fix security scan - remove gitleaks, add permissions\n\n- Remove gitleaks install (requires Go 1.25+)\n- Add security-events permission for SARIF upload\n"
+        },
+        {
+          "hash": "0a4825ac732b9472e04dfe6b3bb2e05ff3a94601",
+          "type": "ci",
+          "subject": "dogfood verdictsec for security scanning",
+          "body": "- Build verdictsec from source and use it to scan itself\n- Run security job after build to ensure binary is available\n- Add gosec SARIF output for GitHub Security tab\n- Include gitleaks for secret detection\n- Upload VerdictSec JSON results as artifact",
+          "author": "Felix Geelhaar",
+          "author_email": "felix@felixgeelhaar.de",
+          "date": "2026-01-02T14:53:43+01:00",
+          "raw_message": "ci: dogfood verdictsec for security scanning\n\n- Build verdictsec from source and use it to scan itself\n- Run security job after build to ensure binary is available\n- Add gosec SARIF output for GitHub Security tab\n- Include gitleaks for secret detection\n- Upload VerdictSec JSON results as artifact\n"
+        }
+      ],
+      "created_at": "2026-01-02T15:44:39+01:00"
+    },
+    "dry_run": false
+  },
+  "created_at": "2026-01-02T15:44:39+01:00",
+  "updated_at": "2026-01-02T15:44:39+01:00"
+}
