@@ -13,7 +13,7 @@ import (
 
 func TestNewServer(t *testing.T) {
 	cfg := config.DefaultConfig()
-	server := NewServer(cfg)
+	server := NewServer(cfg, "test")
 
 	require.NotNil(t, server)
 	assert.NotNil(t, server.mcpServer)
@@ -158,7 +158,7 @@ func TestBaselineAddInput_WithReason(t *testing.T) {
 
 func TestServer_RegistryInitialization(t *testing.T) {
 	cfg := config.DefaultConfig()
-	server := NewServer(cfg)
+	server := NewServer(cfg, "test")
 
 	// Verify registry is properly initialized
 	require.NotNil(t, server.registry)
@@ -167,7 +167,7 @@ func TestServer_RegistryInitialization(t *testing.T) {
 func TestServer_ConfigStored(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Policy.Threshold.FailOn = "CRITICAL"
-	server := NewServer(cfg)
+	server := NewServer(cfg, "test")
 
 	// Verify config is properly stored
 	assert.Equal(t, "CRITICAL", server.config.Policy.Threshold.FailOn)
@@ -238,7 +238,7 @@ func TestServer_HandleConfigResource(t *testing.T) {
 	cfg.Engines.Gitleaks.Enabled = false
 	cfg.Baseline.Path = ".verdict/baseline.json"
 
-	server := NewServer(cfg)
+	server := NewServer(cfg, "test")
 
 	content, err := server.handleConfigResource(context.Background(), "verdict://config", nil)
 
@@ -255,7 +255,7 @@ func TestServer_HandleBaselineResource_NoBaseline(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Baseline.Path = "/nonexistent/baseline.json"
 
-	server := NewServer(cfg)
+	server := NewServer(cfg, "test")
 
 	content, err := server.handleBaselineResource(context.Background(), "verdict://baseline", nil)
 
@@ -271,7 +271,7 @@ func TestServer_HandleBaselineResource_DefaultPath(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Baseline.Path = ""
 
-	server := NewServer(cfg)
+	server := NewServer(cfg, "test")
 
 	content, err := server.handleBaselineResource(context.Background(), "verdict://baseline", nil)
 
@@ -287,7 +287,7 @@ func TestServer_HandleEnginesResource(t *testing.T) {
 	cfg.Engines.Gitleaks.Enabled = false
 	cfg.Engines.CycloneDX.Enabled = false
 
-	server := NewServer(cfg)
+	server := NewServer(cfg, "test")
 
 	content, err := server.handleEnginesResource(context.Background(), "verdict://engines", nil)
 
@@ -314,7 +314,7 @@ func TestServer_RunScan_NoEngines(t *testing.T) {
 	cfg.Engines.Syft.Enabled = false
 	cfg.Engines.Staticcheck.Enabled = false
 
-	server := NewServer(cfg)
+	server := NewServer(cfg, "test")
 
 	input := ScanInput{
 		Path: "",
@@ -335,7 +335,7 @@ func TestServer_RunScan_WithSpecifiedEngines(t *testing.T) {
 	cfg.Engines.Syft.Enabled = false
 	cfg.Engines.Staticcheck.Enabled = false
 
-	server := NewServer(cfg)
+	server := NewServer(cfg, "test")
 
 	// Specify engines via input - parsed from string list
 	input := ScanInput{
@@ -358,7 +358,7 @@ func TestServer_RunScan_StrictModeError(t *testing.T) {
 	cfg.Engines.Syft.Enabled = false
 	cfg.Engines.Staticcheck.Enabled = false
 
-	server := NewServer(cfg)
+	server := NewServer(cfg, "test")
 
 	input := ScanInput{
 		Path:   ".",
@@ -380,7 +380,7 @@ func TestServer_HandleBaselineAdd_Error(t *testing.T) {
 	cfg.Engines.Syft.Enabled = false
 	cfg.Engines.Staticcheck.Enabled = false
 
-	server := NewServer(cfg)
+	server := NewServer(cfg, "test")
 
 	tmpDir := t.TempDir()
 	input := BaselineAddInput{
@@ -405,7 +405,7 @@ func TestServer_HandlePolicyCheck_Error(t *testing.T) {
 	cfg.Engines.Syft.Enabled = false
 	cfg.Engines.Staticcheck.Enabled = false
 
-	server := NewServer(cfg)
+	server := NewServer(cfg, "test")
 
 	tmpDir := t.TempDir()
 	input := PolicyCheckInput{
@@ -428,7 +428,7 @@ func TestServer_RunScan_DefaultPath(t *testing.T) {
 	cfg.Engines.Syft.Enabled = false
 	cfg.Engines.Staticcheck.Enabled = false
 
-	server := NewServer(cfg)
+	server := NewServer(cfg, "test")
 
 	// Empty path should default to "."
 	input := ScanInput{
@@ -449,7 +449,7 @@ func TestServer_RunScan_InputEnginesParsing(t *testing.T) {
 	cfg.Engines.Syft.Enabled = false
 	cfg.Engines.Staticcheck.Enabled = false
 
-	server := NewServer(cfg)
+	server := NewServer(cfg, "test")
 
 	// Specify engine via input
 	input := ScanInput{
@@ -492,7 +492,7 @@ func TestServer_HandleConfigResource_FullConfig(t *testing.T) {
 	cfg.Engines.CycloneDX.Enabled = false
 	cfg.Baseline.Path = ""
 
-	server := NewServer(cfg)
+	server := NewServer(cfg, "test")
 
 	content, err := server.handleConfigResource(context.Background(), "verdict://config", nil)
 
@@ -514,7 +514,7 @@ func TestServer_HandleEnginesResource_AllEngines(t *testing.T) {
 	cfg.Engines.Gitleaks.Enabled = true
 	cfg.Engines.CycloneDX.Enabled = true
 
-	server := NewServer(cfg)
+	server := NewServer(cfg, "test")
 
 	content, err := server.handleEnginesResource(context.Background(), "verdict://engines", nil)
 
@@ -535,7 +535,7 @@ func TestNewServerWithRegistry(t *testing.T) {
 	cfg := config.DefaultConfig()
 	registry := mocks.NewMockRegistry()
 
-	server := NewServerWithRegistry(cfg, registry)
+	server := NewServerWithRegistry(cfg, registry, "test")
 
 	require.NotNil(t, server)
 	assert.Equal(t, registry, server.registry)
@@ -560,7 +560,7 @@ func TestServer_RunScan_WithMockEngine(t *testing.T) {
 	})
 	registry.Register(mockEngine)
 
-	server := NewServerWithRegistry(cfg, registry)
+	server := NewServerWithRegistry(cfg, registry, "test")
 
 	input := ScanInput{
 		Path:    ".",
@@ -611,7 +611,7 @@ func TestServer_RunScan_WithMockEngine_MultipleFindings(t *testing.T) {
 	})
 	registry.Register(mockEngine)
 
-	server := NewServerWithRegistry(cfg, registry)
+	server := NewServerWithRegistry(cfg, registry, "test")
 
 	input := ScanInput{
 		Path:    ".",
@@ -638,7 +638,7 @@ func TestServer_RunScan_WithMockEngine_NoFindings(t *testing.T) {
 	mockEngine.WithFindings([]ports.RawFinding{})
 	registry.Register(mockEngine)
 
-	server := NewServerWithRegistry(cfg, registry)
+	server := NewServerWithRegistry(cfg, registry, "test")
 
 	input := ScanInput{
 		Path:    ".",
@@ -662,7 +662,7 @@ func TestServer_HandleScan_WithMockEngine(t *testing.T) {
 	mockEngine.CapabilitiesValue = []ports.Capability{ports.CapabilitySAST}
 	registry.Register(mockEngine)
 
-	server := NewServerWithRegistry(cfg, registry)
+	server := NewServerWithRegistry(cfg, registry, "test")
 
 	input := ScanInput{Path: "."}
 	result, err := server.handleScan(context.Background(), input)
@@ -680,7 +680,7 @@ func TestServer_HandleSAST_WithMockEngine(t *testing.T) {
 	mockEngine.CapabilitiesValue = []ports.Capability{ports.CapabilitySAST}
 	registry.Register(mockEngine)
 
-	server := NewServerWithRegistry(cfg, registry)
+	server := NewServerWithRegistry(cfg, registry, "test")
 
 	input := ScanInput{Path: "."}
 	result, err := server.handleSAST(context.Background(), input)
@@ -698,7 +698,7 @@ func TestServer_HandleVuln_WithMockEngine(t *testing.T) {
 	mockEngine.CapabilitiesValue = []ports.Capability{ports.CapabilityVuln}
 	registry.Register(mockEngine)
 
-	server := NewServerWithRegistry(cfg, registry)
+	server := NewServerWithRegistry(cfg, registry, "test")
 
 	input := ScanInput{Path: "."}
 	result, err := server.handleVuln(context.Background(), input)
@@ -716,7 +716,7 @@ func TestServer_HandleSecrets_WithMockEngine(t *testing.T) {
 	mockEngine.CapabilitiesValue = []ports.Capability{ports.CapabilitySecrets}
 	registry.Register(mockEngine)
 
-	server := NewServerWithRegistry(cfg, registry)
+	server := NewServerWithRegistry(cfg, registry, "test")
 
 	input := ScanInput{Path: "."}
 	result, err := server.handleSecrets(context.Background(), input)
@@ -743,7 +743,7 @@ func TestServer_HandleBaselineAdd_WithMockEngine(t *testing.T) {
 	})
 	registry.Register(mockEngine)
 
-	server := NewServerWithRegistry(cfg, registry)
+	server := NewServerWithRegistry(cfg, registry, "test")
 
 	tmpDir := t.TempDir()
 	input := BaselineAddInput{
@@ -778,7 +778,7 @@ func TestServer_HandlePolicyCheck_WithMockEngine(t *testing.T) {
 	})
 	registry.Register(mockEngine)
 
-	server := NewServerWithRegistry(cfg, registry)
+	server := NewServerWithRegistry(cfg, registry, "test")
 
 	input := PolicyCheckInput{Path: "."}
 	result, err := server.handlePolicyCheck(context.Background(), input)
@@ -806,7 +806,7 @@ func TestServer_HandlePolicyCheck_WithMockEngine_Fail(t *testing.T) {
 	})
 	registry.Register(mockEngine)
 
-	server := NewServerWithRegistry(cfg, registry)
+	server := NewServerWithRegistry(cfg, registry, "test")
 
 	input := PolicyCheckInput{Path: "."}
 	result, err := server.handlePolicyCheck(context.Background(), input)

@@ -24,16 +24,19 @@ type Server struct {
 }
 
 // NewServer creates a new VerdictSec MCP server.
-func NewServer(cfg *config.Config) *Server {
-	return NewServerWithRegistry(cfg, engines.NewDefaultRegistry())
+func NewServer(cfg *config.Config, version string) *Server {
+	return NewServerWithRegistry(cfg, engines.NewDefaultRegistry(), version)
 }
 
 // NewServerWithRegistry creates a new VerdictSec MCP server with a custom registry.
 // This is primarily used for testing with mock engines.
-func NewServerWithRegistry(cfg *config.Config, registry ports.EngineRegistry) *Server {
+func NewServerWithRegistry(cfg *config.Config, registry ports.EngineRegistry, version string) *Server {
+	if version == "" {
+		version = "dev"
+	}
 	srv := mcp.NewServer(mcp.ServerInfo{
 		Name:    "verdictsec",
-		Version: "1.0.0",
+		Version: version,
 		Capabilities: mcp.Capabilities{
 			Tools:     true,
 			Resources: true,

@@ -77,8 +77,8 @@ func runMCPServer(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	// Create MCP server
-	server := mcp.NewServer(cfg)
+	// Create MCP server with CLI version
+	server := mcp.NewServer(cfg, version)
 
 	// Start server with selected transport
 	switch mcpTransport {
