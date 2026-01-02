@@ -2,6 +2,8 @@ package gitleaks
 
 import (
 	"context"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/felixgeelhaar/verdictsec/internal/application/ports"
@@ -132,4 +134,81 @@ func TestAdapter_Info(t *testing.T) {
 	assert.Contains(t, info.InstallCmd, "github.com/gitleaks/gitleaks")
 	assert.Equal(t, "https://github.com/gitleaks/gitleaks", info.Homepage)
 	assert.Equal(t, ports.CapabilitySecrets, info.Capability)
+}
+
+func TestAdapter_BuildEnv_Default(t *testing.T) {
+	adapter := NewAdapter()
+	config := ports.EngineConfig{Enabled: true, Settings: make(map[string]string)}
+
+	env := adapter.buildEnv(config)
+
+	// Should inherit parent environment
+	assert.NotEmpty(t, env)
+}
+
+func TestAdapter_BuildEnv_WithLicenseEnv(t *testing.T) {
+	adapter := NewAdapter()
+
+	// Set test env var
+	testLicense := "test-license-key-12345"
+	os.Setenv("TEST_GITLEAKS_LICENSE", testLicense)
+	defer os.Unsetenv("TEST_GITLEAKS_LICENSE")
+
+	config := ports.EngineConfig{
+		Enabled:  true,
+		Settings: map[string]string{"license_env": "TEST_GITLEAKS_LICENSE"},
+	}
+
+	env := adapter.buildEnv(config)
+
+	// Find the GITLEAKS_LICENSE entry
+	var found bool
+	for _, e := range env {
+		if strings.HasPrefix(e, "GITLEAKS_LICENSE=") {
+			assert.Equal(t, "GITLEAKS_LICENSE="+testLicense, e)
+			found = true
+			break
+		}
+	}
+	assert.True(t, found, "GITLEAKS_LICENSE should be in environment")
+}
+
+func TestAdapter_BuildEnv_WithDirectLicense(t *testing.T) {
+	adapter := NewAdapter()
+
+	config := ports.EngineConfig{
+		Enabled:  true,
+		Settings: map[string]string{"license": "direct-license-key"},
+	}
+
+	env := adapter.buildEnv(config)
+
+	// Find the GITLEAKS_LICENSE entry
+	var found bool
+	for _, e := range env {
+		if strings.HasPrefix(e, "GITLEAKS_LICENSE=") {
+			assert.Equal(t, "GITLEAKS_LICENSE=direct-license-key", e)
+			found = true
+			break
+		}
+	}
+	assert.True(t, found, "GITLEAKS_LICENSE should be in environment")
+}
+
+func TestAdapter_BuildEnv_LicenseEnvMissing(t *testing.T) {
+	adapter := NewAdapter()
+
+	// Reference a non-existent env var
+	config := ports.EngineConfig{
+		Enabled:  true,
+		Settings: map[string]string{"license_env": "NONEXISTENT_ENV_VAR"},
+	}
+
+	env := adapter.buildEnv(config)
+
+	// GITLEAKS_LICENSE should NOT be added
+	for _, e := range env {
+		assert.False(t, strings.HasPrefix(e, "GITLEAKS_LICENSE="),
+			"GITLEAKS_LICENSE should not be set when env var is missing")
+	}
 }

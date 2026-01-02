@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -97,6 +98,9 @@ func (a *Adapter) Run(ctx context.Context, target ports.Target, config ports.Eng
 	cmd := exec.CommandContext(ctx, a.binaryPath, args...) // #nosec G204 - binary path is controlled, target path is validated
 	cmd.Dir = cleanPath
 
+	// Configure environment with any additional settings
+	cmd.Env = a.buildEnv(config)
+
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -170,6 +174,27 @@ func (a *Adapter) buildArgs(target ports.Target, config ports.EngineConfig) []st
 	}
 
 	return args
+}
+
+// buildEnv constructs the environment for gitleaks execution.
+// It inherits the parent environment and adds any enterprise credentials.
+func (a *Adapter) buildEnv(config ports.EngineConfig) []string {
+	// Start with parent environment
+	env := os.Environ()
+
+	// Add license from config if specified
+	// Supports: license_env (reference to env var) or license (direct value)
+	if licenseEnv, ok := config.Settings["license_env"]; ok {
+		// Reference to another env var (e.g., "GITLEAKS_LICENSE")
+		if val := os.Getenv(licenseEnv); val != "" {
+			env = append(env, "GITLEAKS_LICENSE="+val)
+		}
+	} else if license, ok := config.Settings["license"]; ok {
+		// Direct value (less recommended for security)
+		env = append(env, "GITLEAKS_LICENSE="+license)
+	}
+
+	return env
 }
 
 // detectVersion gets the gitleaks version.
