@@ -571,10 +571,10 @@ type engineStatusData struct {
 }
 
 func (s *Server) handleEnginesResource(_ context.Context, uri string, _ map[string]string) (*mcp.ResourceContent, error) {
-	engineStatus := make([]engineStatusData, 0, 4)
+	engineStatus := make([]engineStatusData, 0, 6)
 
 	// Check each engine
-	for _, id := range []ports.EngineID{ports.EngineGosec, ports.EngineGovulncheck, ports.EngineGitleaks, ports.EngineCycloneDX} {
+	for _, id := range []ports.EngineID{ports.EngineGosec, ports.EngineGovulncheck, ports.EngineGitleaks, ports.EngineCycloneDX, ports.EngineStaticcheck, ports.EngineSyft} {
 		_, available := s.registry.Get(id)
 
 		var enabled bool
@@ -587,6 +587,10 @@ func (s *Server) handleEnginesResource(_ context.Context, uri string, _ map[stri
 			enabled = s.config.Engines.Gitleaks.Enabled
 		case ports.EngineCycloneDX:
 			enabled = s.config.Engines.CycloneDX.Enabled
+		case ports.EngineStaticcheck:
+			enabled = s.config.Engines.Staticcheck.Enabled
+		case ports.EngineSyft:
+			enabled = s.config.Engines.Syft.Enabled
 		}
 
 		engineStatus = append(engineStatus, engineStatusData{

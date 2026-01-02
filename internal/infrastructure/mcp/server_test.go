@@ -300,6 +300,8 @@ func TestServer_HandleEnginesResource(t *testing.T) {
 	assert.Contains(t, content.Text, `"id":"govulncheck"`)
 	assert.Contains(t, content.Text, `"id":"gitleaks"`)
 	assert.Contains(t, content.Text, `"id":"cyclonedx-gomod"`)
+	assert.Contains(t, content.Text, `"id":"staticcheck"`)
+	assert.Contains(t, content.Text, `"id":"syft"`)
 }
 
 func TestServer_RunScan_NoEngines(t *testing.T) {
@@ -523,6 +525,8 @@ func TestServer_HandleEnginesResource_AllEngines(t *testing.T) {
 	assert.Contains(t, content.Text, `"id":"govulncheck"`)
 	assert.Contains(t, content.Text, `"id":"gitleaks"`)
 	assert.Contains(t, content.Text, `"id":"cyclonedx-gomod"`)
+	assert.Contains(t, content.Text, `"id":"staticcheck"`)
+	assert.Contains(t, content.Text, `"id":"syft"`)
 }
 
 // Tests with mock engines
