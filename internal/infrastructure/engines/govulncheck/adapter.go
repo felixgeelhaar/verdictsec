@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -94,6 +95,9 @@ func (a *Adapter) Run(ctx context.Context, target ports.Target, config ports.Eng
 	cmd := exec.CommandContext(ctx, a.binaryPath, args...) // #nosec G204 - binary path is controlled, target path is validated
 	cmd.Dir = cleanPath
 
+	// Configure environment with any additional settings (GOPRIVATE, GONOPROXY, etc.)
+	cmd.Env = a.buildEnv(config)
+
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -141,6 +145,51 @@ func (a *Adapter) buildArgs(target ports.Target, config ports.EngineConfig) []st
 	args = append(args, "./...")
 
 	return args
+}
+
+// buildEnv constructs the environment for govulncheck execution.
+// It inherits the parent environment and adds private module configuration.
+func (a *Adapter) buildEnv(config ports.EngineConfig) []string {
+	// Start with parent environment
+	env := os.Environ()
+
+	// Add GOPRIVATE from config if specified
+	// Supports: goprivate_env (reference to env var) or goprivate (direct value)
+	if goprivateEnv, ok := config.Settings["goprivate_env"]; ok {
+		// Reference to another env var (e.g., "GOPRIVATE")
+		if val := os.Getenv(goprivateEnv); val != "" {
+			env = append(env, "GOPRIVATE="+val)
+		}
+	} else if goprivate, ok := config.Settings["goprivate"]; ok {
+		// Direct value
+		env = append(env, "GOPRIVATE="+goprivate)
+	}
+
+	// Add GONOPROXY from config if specified
+	// Supports: gonoproxy_env (reference to env var) or gonoproxy (direct value)
+	if gonoproxyEnv, ok := config.Settings["gonoproxy_env"]; ok {
+		// Reference to another env var (e.g., "GONOPROXY")
+		if val := os.Getenv(gonoproxyEnv); val != "" {
+			env = append(env, "GONOPROXY="+val)
+		}
+	} else if gonoproxy, ok := config.Settings["gonoproxy"]; ok {
+		// Direct value
+		env = append(env, "GONOPROXY="+gonoproxy)
+	}
+
+	// Add GONOSUMDB from config if specified
+	// Supports: gonosumdb_env (reference to env var) or gonosumdb (direct value)
+	if gonosumdbEnv, ok := config.Settings["gonosumdb_env"]; ok {
+		// Reference to another env var (e.g., "GONOSUMDB")
+		if val := os.Getenv(gonosumdbEnv); val != "" {
+			env = append(env, "GONOSUMDB="+val)
+		}
+	} else if gonosumdb, ok := config.Settings["gonosumdb"]; ok {
+		// Direct value
+		env = append(env, "GONOSUMDB="+gonosumdb)
+	}
+
+	return env
 }
 
 // detectVersion gets the govulncheck version.

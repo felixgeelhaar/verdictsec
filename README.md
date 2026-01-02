@@ -145,6 +145,69 @@ baseline:
   path: .verdict/baseline.json
 ```
 
+## Enterprise Configuration
+
+VerdictSec supports enterprise features through secure credential configuration.
+
+### Gitleaks Enterprise License
+
+For [Gitleaks Enterprise](https://gitleaks.io/) features, configure the license via environment variable reference:
+
+```yaml
+# .verdict/config.yaml
+engines:
+  gitleaks:
+    enabled: true
+    settings:
+      license_env: GITLEAKS_LICENSE  # References env var (recommended)
+      config: ".gitleaks.toml"       # Optional custom rules
+```
+
+Set the environment variable:
+
+```bash
+# Local development (.envrc with direnv, or shell profile)
+export GITLEAKS_LICENSE="your-enterprise-token"
+
+# CI/CD (GitHub Actions)
+env:
+  GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+```
+
+### Private Go Modules
+
+For scanning private Go modules with govulncheck:
+
+```yaml
+# .verdict/config.yaml
+engines:
+  govulncheck:
+    enabled: true
+    settings:
+      goprivate_env: GOPRIVATE      # Reference to GOPRIVATE env var
+      gonoproxy_env: GONOPROXY      # Reference to GONOPROXY env var
+      gonosumdb_env: GONOSUMDB      # Reference to GONOSUMDB env var
+```
+
+```bash
+# Local development
+export GOPRIVATE="github.com/mycompany/*"
+export GONOPROXY="github.com/mycompany/*"
+export GONOSUMDB="github.com/mycompany/*"
+```
+
+### Custom Engine Configuration
+
+For gitleaks, you can specify a custom configuration file:
+
+```yaml
+engines:
+  gitleaks:
+    settings:
+      config: ".gitleaks.toml"      # Custom rules/allowlist
+      mode: "git"                   # Scan git history (default: files only)
+```
+
 ## Baseline Management
 
 Suppress known findings that have been reviewed:

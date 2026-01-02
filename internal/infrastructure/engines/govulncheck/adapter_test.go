@@ -2,6 +2,8 @@ package govulncheck
 
 import (
 	"context"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/felixgeelhaar/verdictsec/internal/application/ports"
@@ -150,4 +152,176 @@ func TestAdapter_Info(t *testing.T) {
 	assert.Contains(t, info.InstallCmd, "golang.org/x/vuln/cmd/govulncheck")
 	assert.Equal(t, "https://pkg.go.dev/golang.org/x/vuln/cmd/govulncheck", info.Homepage)
 	assert.Equal(t, ports.CapabilityVuln, info.Capability)
+}
+
+func TestAdapter_BuildEnv_Default(t *testing.T) {
+	adapter := NewAdapter()
+	config := ports.EngineConfig{Enabled: true, Settings: make(map[string]string)}
+
+	env := adapter.buildEnv(config)
+
+	// Should inherit parent environment
+	assert.NotEmpty(t, env)
+}
+
+func TestAdapter_BuildEnv_WithGoprivateEnv(t *testing.T) {
+	adapter := NewAdapter()
+
+	// Set test env var
+	testGoprivate := "github.com/mycompany/*"
+	os.Setenv("TEST_GOPRIVATE", testGoprivate)
+	defer os.Unsetenv("TEST_GOPRIVATE")
+
+	config := ports.EngineConfig{
+		Enabled:  true,
+		Settings: map[string]string{"goprivate_env": "TEST_GOPRIVATE"},
+	}
+
+	env := adapter.buildEnv(config)
+
+	// Find the GOPRIVATE entry
+	var found bool
+	for _, e := range env {
+		if strings.HasPrefix(e, "GOPRIVATE=") {
+			assert.Equal(t, "GOPRIVATE="+testGoprivate, e)
+			found = true
+			break
+		}
+	}
+	assert.True(t, found, "GOPRIVATE should be in environment")
+}
+
+func TestAdapter_BuildEnv_WithDirectGoprivate(t *testing.T) {
+	adapter := NewAdapter()
+
+	config := ports.EngineConfig{
+		Enabled:  true,
+		Settings: map[string]string{"goprivate": "github.com/myorg/*"},
+	}
+
+	env := adapter.buildEnv(config)
+
+	// Find the GOPRIVATE entry
+	var found bool
+	for _, e := range env {
+		if strings.HasPrefix(e, "GOPRIVATE=") {
+			assert.Equal(t, "GOPRIVATE=github.com/myorg/*", e)
+			found = true
+			break
+		}
+	}
+	assert.True(t, found, "GOPRIVATE should be in environment")
+}
+
+func TestAdapter_BuildEnv_GoprivateEnvMissing(t *testing.T) {
+	adapter := NewAdapter()
+
+	// Reference a non-existent env var
+	config := ports.EngineConfig{
+		Enabled:  true,
+		Settings: map[string]string{"goprivate_env": "NONEXISTENT_ENV_VAR"},
+	}
+
+	env := adapter.buildEnv(config)
+
+	// GOPRIVATE should NOT be added
+	for _, e := range env {
+		assert.False(t, strings.HasPrefix(e, "GOPRIVATE="),
+			"GOPRIVATE should not be set when env var is missing")
+	}
+}
+
+func TestAdapter_BuildEnv_WithGonoproxyEnv(t *testing.T) {
+	adapter := NewAdapter()
+
+	// Set test env var
+	testGonoproxy := "github.com/mycompany/*"
+	os.Setenv("TEST_GONOPROXY", testGonoproxy)
+	defer os.Unsetenv("TEST_GONOPROXY")
+
+	config := ports.EngineConfig{
+		Enabled:  true,
+		Settings: map[string]string{"gonoproxy_env": "TEST_GONOPROXY"},
+	}
+
+	env := adapter.buildEnv(config)
+
+	// Find the GONOPROXY entry
+	var found bool
+	for _, e := range env {
+		if strings.HasPrefix(e, "GONOPROXY=") {
+			assert.Equal(t, "GONOPROXY="+testGonoproxy, e)
+			found = true
+			break
+		}
+	}
+	assert.True(t, found, "GONOPROXY should be in environment")
+}
+
+func TestAdapter_BuildEnv_WithGonosumdbEnv(t *testing.T) {
+	adapter := NewAdapter()
+
+	// Set test env var
+	testGonosumdb := "github.com/mycompany/*"
+	os.Setenv("TEST_GONOSUMDB", testGonosumdb)
+	defer os.Unsetenv("TEST_GONOSUMDB")
+
+	config := ports.EngineConfig{
+		Enabled:  true,
+		Settings: map[string]string{"gonosumdb_env": "TEST_GONOSUMDB"},
+	}
+
+	env := adapter.buildEnv(config)
+
+	// Find the GONOSUMDB entry
+	var found bool
+	for _, e := range env {
+		if strings.HasPrefix(e, "GONOSUMDB=") {
+			assert.Equal(t, "GONOSUMDB="+testGonosumdb, e)
+			found = true
+			break
+		}
+	}
+	assert.True(t, found, "GONOSUMDB should be in environment")
+}
+
+func TestAdapter_BuildEnv_AllPrivateModuleSettings(t *testing.T) {
+	adapter := NewAdapter()
+
+	// Set test env vars
+	os.Setenv("MY_GOPRIVATE", "github.com/company/*")
+	os.Setenv("MY_GONOPROXY", "github.com/company/*")
+	os.Setenv("MY_GONOSUMDB", "github.com/company/*")
+	defer os.Unsetenv("MY_GOPRIVATE")
+	defer os.Unsetenv("MY_GONOPROXY")
+	defer os.Unsetenv("MY_GONOSUMDB")
+
+	config := ports.EngineConfig{
+		Enabled: true,
+		Settings: map[string]string{
+			"goprivate_env": "MY_GOPRIVATE",
+			"gonoproxy_env": "MY_GONOPROXY",
+			"gonosumdb_env": "MY_GONOSUMDB",
+		},
+	}
+
+	env := adapter.buildEnv(config)
+
+	// Count how many private module vars were set
+	var foundGoprivate, foundGonoproxy, foundGonosumdb bool
+	for _, e := range env {
+		if strings.HasPrefix(e, "GOPRIVATE=") {
+			foundGoprivate = true
+		}
+		if strings.HasPrefix(e, "GONOPROXY=") {
+			foundGonoproxy = true
+		}
+		if strings.HasPrefix(e, "GONOSUMDB=") {
+			foundGonosumdb = true
+		}
+	}
+
+	assert.True(t, foundGoprivate, "GOPRIVATE should be in environment")
+	assert.True(t, foundGonoproxy, "GONOPROXY should be in environment")
+	assert.True(t, foundGonosumdb, "GONOSUMDB should be in environment")
 }
