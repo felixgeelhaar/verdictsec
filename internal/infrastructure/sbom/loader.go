@@ -12,6 +12,7 @@ import (
 	domainsbom "github.com/felixgeelhaar/verdictsec/internal/domain/sbom"
 	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/engines/cyclonedx"
 	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/engines/syft"
+	"github.com/felixgeelhaar/verdictsec/pkg/pathutil"
 )
 
 // Loader implements ports.SBOMLoader.
@@ -25,7 +26,13 @@ func NewLoader() *Loader {
 // LoadFromFile loads an SBOM from a file path.
 // It auto-detects the format from file contents.
 func (l *Loader) LoadFromFile(ctx context.Context, path string) (*domainsbom.SBOM, error) {
-	data, err := os.ReadFile(path)
+	// Validate path to prevent directory traversal attacks
+	cleanPath, err := pathutil.ValidatePath(path)
+	if err != nil {
+		return nil, fmt.Errorf("invalid file path: %w", err)
+	}
+
+	data, err := os.ReadFile(cleanPath) // #nosec G304 - path is validated above
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file: %w", err)
 	}
