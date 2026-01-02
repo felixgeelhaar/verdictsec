@@ -34,6 +34,10 @@ func NewServerWithRegistry(cfg *config.Config, registry ports.EngineRegistry) *S
 	srv := mcp.NewServer(mcp.ServerInfo{
 		Name:    "verdictsec",
 		Version: "1.0.0",
+		Capabilities: mcp.Capabilities{
+			Tools:     true,
+			Resources: true,
+		},
 	})
 
 	s := &Server{
