@@ -168,6 +168,73 @@ verdictsec/
 └── .github/                # GitHub configuration
 ```
 
+## Adding New Engines
+
+When adding a new security engine to VerdictSec, follow these steps:
+
+### 1. Create the Engine Adapter
+
+Create a new package under `internal/infrastructure/engines/<engine-name>/`:
+
+```go
+// adapter.go
+type Adapter struct{}
+
+func NewAdapter() *Adapter { return &Adapter{} }
+
+func (a *Adapter) ID() ports.EngineID { return ports.EngineYourEngine }
+func (a *Adapter) Info() ports.EngineInfo { /* ... */ }
+func (a *Adapter) Capabilities() []ports.Capability { /* ... */ }
+func (a *Adapter) IsAvailable() bool { /* ... */ }
+func (a *Adapter) Version() string { /* ... */ }
+func (a *Adapter) Run(ctx context.Context, target ports.Target, cfg ports.EngineConfig) (ports.EngineResult, error) { /* ... */ }
+```
+
+### 2. Add Engine ID Constant
+
+In `internal/application/ports/engine.go`:
+
+```go
+const (
+    // ... existing engines
+    EngineYourEngine EngineID = "your-engine"
+)
+```
+
+### 3. Register in Default Registry
+
+In `internal/infrastructure/engines/init.go`:
+
+```go
+func NewDefaultRegistry() ports.EngineRegistry {
+    registry := NewRegistry()
+    // ... existing registrations
+    registry.Register(yourengine.NewAdapter())
+    return registry
+}
+```
+
+### 4. Add Configuration Schema
+
+In `internal/infrastructure/config/schema.go`:
+
+```go
+type EnginesConfig struct {
+    // ... existing engines
+    YourEngine EngineSettings `yaml:"your-engine" json:"your-engine"`
+}
+```
+
+And add to `DefaultConfig()` and `EngineConfig()` methods.
+
+### 5. Add Tests
+
+- Unit tests for the adapter
+- Integration with registry
+- Normalization tests if custom parsing is needed
+
+The MCP server and CLI automatically discover engines from the registry - no additional changes needed there.
+
 ## Review Process
 
 1. All PRs require at least one approval

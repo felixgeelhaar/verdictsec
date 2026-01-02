@@ -189,26 +189,22 @@ func (s *Server) runScan(ctx context.Context, input ScanInput, forceEngines []po
 	if len(forceEngines) > 0 {
 		engineIDs = forceEngines
 	} else if len(input.Engines) > 0 {
+		// Parse engine names dynamically - EngineID is a string type
 		for _, e := range input.Engines {
-			switch e {
-			case "gosec":
-				engineIDs = append(engineIDs, ports.EngineGosec)
-			case "govulncheck":
-				engineIDs = append(engineIDs, ports.EngineGovulncheck)
-			case "gitleaks":
-				engineIDs = append(engineIDs, ports.EngineGitleaks)
+			id := ports.EngineID(e)
+			// Verify the engine exists in registry
+			if _, ok := s.registry.Get(id); ok {
+				engineIDs = append(engineIDs, id)
 			}
 		}
 	} else {
-		// Use config defaults
-		if s.config.Engines.Gosec.Enabled {
-			engineIDs = append(engineIDs, ports.EngineGosec)
-		}
-		if s.config.Engines.Govulncheck.Enabled {
-			engineIDs = append(engineIDs, ports.EngineGovulncheck)
-		}
-		if s.config.Engines.Gitleaks.Enabled {
-			engineIDs = append(engineIDs, ports.EngineGitleaks)
+		// Use all enabled engines from registry dynamically
+		for _, engine := range s.registry.All() {
+			id := engine.ID()
+			engineCfg := s.config.EngineConfig(string(id))
+			if engineCfg.Enabled {
+				engineIDs = append(engineIDs, id)
+			}
 		}
 	}
 
@@ -292,16 +288,14 @@ func (s *Server) handleBaselineAdd(ctx context.Context, input BaselineAddInput) 
 	normalizer := engines.NewCompositeNormalizer()
 	scanUseCase := usecases.NewRunScanUseCase(s.registry, normalizer, writer)
 
-	// Get enabled engines
+	// Get enabled engines dynamically from registry
 	var engineIDs []ports.EngineID
-	if s.config.Engines.Gosec.Enabled {
-		engineIDs = append(engineIDs, ports.EngineGosec)
-	}
-	if s.config.Engines.Govulncheck.Enabled {
-		engineIDs = append(engineIDs, ports.EngineGovulncheck)
-	}
-	if s.config.Engines.Gitleaks.Enabled {
-		engineIDs = append(engineIDs, ports.EngineGitleaks)
+	for _, engine := range s.registry.All() {
+		id := engine.ID()
+		engineCfg := s.config.EngineConfig(string(id))
+		if engineCfg.Enabled {
+			engineIDs = append(engineIDs, id)
+		}
 	}
 
 	// Execute scan
@@ -387,16 +381,14 @@ func (s *Server) handlePolicyCheck(ctx context.Context, input PolicyCheckInput) 
 	normalizer := engines.NewCompositeNormalizer()
 	scanUseCase := usecases.NewRunScanUseCase(s.registry, normalizer, writer)
 
-	// Get enabled engines
+	// Get enabled engines dynamically from registry
 	var engineIDs []ports.EngineID
-	if s.config.Engines.Gosec.Enabled {
-		engineIDs = append(engineIDs, ports.EngineGosec)
-	}
-	if s.config.Engines.Govulncheck.Enabled {
-		engineIDs = append(engineIDs, ports.EngineGovulncheck)
-	}
-	if s.config.Engines.Gitleaks.Enabled {
-		engineIDs = append(engineIDs, ports.EngineGitleaks)
+	for _, engine := range s.registry.All() {
+		id := engine.ID()
+		engineCfg := s.config.EngineConfig(string(id))
+		if engineCfg.Enabled {
+			engineIDs = append(engineIDs, id)
+		}
 	}
 
 	// Execute scan
@@ -456,11 +448,8 @@ type configPolicyData struct {
 	BaselineMode string `json:"baseline_mode"`
 }
 
-type configEnginesData struct {
-	Gosec       configEngineStatus `json:"gosec"`
-	Govulncheck configEngineStatus `json:"govulncheck"`
-	Gitleaks    configEngineStatus `json:"gitleaks"`
-}
+// configEnginesData is a map of engine ID to status for dynamic engine support
+type configEnginesData map[string]configEngineStatus
 
 type configEngineStatus struct {
 	Enabled bool `json:"enabled"`
@@ -471,6 +460,14 @@ type configBaselineData struct {
 }
 
 func (s *Server) handleConfigResource(_ context.Context, uri string, _ map[string]string) (*mcp.ResourceContent, error) {
+	// Build engines config dynamically from registry
+	enginesData := make(configEnginesData)
+	for _, engine := range s.registry.All() {
+		id := string(engine.ID())
+		engineCfg := s.config.EngineConfig(id)
+		enginesData[id] = configEngineStatus{Enabled: engineCfg.Enabled}
+	}
+
 	data := configResourceData{
 		Version: s.config.Version,
 		Policy: configPolicyData{
@@ -478,11 +475,7 @@ func (s *Server) handleConfigResource(_ context.Context, uri string, _ map[strin
 			WarnOn:       s.config.Policy.Threshold.WarnOn,
 			BaselineMode: s.config.Policy.BaselineMode,
 		},
-		Engines: configEnginesData{
-			Gosec:       configEngineStatus{Enabled: s.config.Engines.Gosec.Enabled},
-			Govulncheck: configEngineStatus{Enabled: s.config.Engines.Govulncheck.Enabled},
-			Gitleaks:    configEngineStatus{Enabled: s.config.Engines.Gitleaks.Enabled},
-		},
+		Engines: enginesData,
 		Baseline: configBaselineData{
 			Path: s.config.Baseline.Path,
 		},
@@ -571,32 +564,18 @@ type engineStatusData struct {
 }
 
 func (s *Server) handleEnginesResource(_ context.Context, uri string, _ map[string]string) (*mcp.ResourceContent, error) {
-	engineStatus := make([]engineStatusData, 0, 6)
+	// Dynamically get all engines from registry
+	allEngines := s.registry.All()
+	engineStatus := make([]engineStatusData, 0, len(allEngines))
 
-	// Check each engine
-	for _, id := range []ports.EngineID{ports.EngineGosec, ports.EngineGovulncheck, ports.EngineGitleaks, ports.EngineCycloneDX, ports.EngineStaticcheck, ports.EngineSyft} {
-		_, available := s.registry.Get(id)
-
-		var enabled bool
-		switch id {
-		case ports.EngineGosec:
-			enabled = s.config.Engines.Gosec.Enabled
-		case ports.EngineGovulncheck:
-			enabled = s.config.Engines.Govulncheck.Enabled
-		case ports.EngineGitleaks:
-			enabled = s.config.Engines.Gitleaks.Enabled
-		case ports.EngineCycloneDX:
-			enabled = s.config.Engines.CycloneDX.Enabled
-		case ports.EngineStaticcheck:
-			enabled = s.config.Engines.Staticcheck.Enabled
-		case ports.EngineSyft:
-			enabled = s.config.Engines.Syft.Enabled
-		}
+	for _, engine := range allEngines {
+		id := engine.ID()
+		engineCfg := s.config.EngineConfig(string(id))
 
 		engineStatus = append(engineStatus, engineStatusData{
 			ID:        string(id),
-			Available: available,
-			Enabled:   enabled,
+			Available: engine.IsAvailable(),
+			Enabled:   engineCfg.Enabled,
 		})
 	}
 
