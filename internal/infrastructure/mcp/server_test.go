@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/felixgeelhaar/verdictsec/internal/application/ports"
@@ -977,4 +978,167 @@ func TestScanResult_TruncationInfo_Structure(t *testing.T) {
 	assert.Equal(t, 20, info.HiddenBySeverity["LOW"])
 	assert.Equal(t, "priority", info.Strategy)
 	assert.Contains(t, info.Message, "50 of 150")
+}
+
+// Baseline Filtering Tests
+
+func TestServer_RunScan_WithBaselineFiltering(t *testing.T) {
+	// Create a temp directory with baseline file
+	tmpDir := t.TempDir()
+	baselinePath := tmpDir + "/baseline.json"
+
+	cfg := config.DefaultConfig()
+	cfg.Engines.Gosec.Enabled = true
+	cfg.Baseline.Path = baselinePath
+	cfg.MCP.MaxFindings = -1 // Disable truncation
+
+	registry := mocks.NewMockRegistry()
+	mockEngine := mocks.NewMockEngine(ports.EngineGosec)
+	mockEngine.CapabilitiesValue = []ports.Capability{ports.CapabilitySAST}
+	// Create 3 findings
+	mockEngine.WithFindings([]ports.RawFinding{
+		{RuleID: "G401", Message: "Issue 1", Severity: "HIGH", File: "a.go", StartLine: 10},
+		{RuleID: "G401", Message: "Issue 2", Severity: "HIGH", File: "b.go", StartLine: 20},
+		{RuleID: "G401", Message: "Issue 3", Severity: "HIGH", File: "c.go", StartLine: 30},
+	})
+	registry.Register(mockEngine)
+
+	// First run without baseline - should show all findings
+	server := NewServerWithRegistry(cfg, registry, "test")
+	input := ScanInput{Path: ".", Engines: []string{"gosec"}}
+
+	result, err := server.runScan(context.Background(), input, nil)
+	require.NoError(t, err)
+	assert.Equal(t, 3, result.TotalCount)
+	assert.Equal(t, 0, result.BaselinedCount)
+	assert.Len(t, result.Findings, 3)
+
+	// Create baseline with first 2 findings using correct JSON structure
+	baselineData := `{
+		"version": "1",
+		"scope": {"project": "."},
+		"fingerprints": [
+			{"fingerprint": "` + result.Findings[0].Fingerprint + `", "rule_id": "G401", "engine_id": "gosec", "file": "a.go", "reason": "Test baseline"},
+			{"fingerprint": "` + result.Findings[1].Fingerprint + `", "rule_id": "G401", "engine_id": "gosec", "file": "b.go", "reason": "Test baseline"}
+		]
+	}`
+	err = os.WriteFile(baselinePath, []byte(baselineData), 0644)
+	require.NoError(t, err)
+
+	// Re-run scan with baseline - should filter 2 findings
+	result2, err := server.runScan(context.Background(), input, nil)
+	require.NoError(t, err)
+	assert.Equal(t, 1, result2.TotalCount, "only non-baselined findings should be counted")
+	assert.Equal(t, 2, result2.BaselinedCount, "should report 2 baselined findings")
+	assert.Len(t, result2.Findings, 1)
+}
+
+func TestServer_PolicyCheck_WithBaselineFiltering(t *testing.T) {
+	// Create a temp directory with baseline file
+	tmpDir := t.TempDir()
+	baselinePath := tmpDir + "/baseline.json"
+
+	cfg := config.DefaultConfig()
+	cfg.Engines.Gosec.Enabled = true
+	cfg.Baseline.Path = baselinePath
+	cfg.Policy.Threshold.FailOn = "HIGH"
+
+	registry := mocks.NewMockRegistry()
+	mockEngine := mocks.NewMockEngine(ports.EngineGosec)
+	mockEngine.CapabilitiesValue = []ports.Capability{ports.CapabilitySAST}
+	// Create HIGH severity finding that would normally cause FAIL
+	mockEngine.WithFindings([]ports.RawFinding{
+		{RuleID: "G401", Message: "Weak crypto", Severity: "HIGH", File: "crypto.go", StartLine: 15},
+	})
+	registry.Register(mockEngine)
+
+	server := NewServerWithRegistry(cfg, registry, "test")
+
+	// First check without baseline - should FAIL
+	result, err := server.handlePolicyCheck(context.Background(), PolicyCheckInput{Path: "."})
+	require.NoError(t, err)
+	assert.Equal(t, "FAIL", result.Decision)
+	assert.Equal(t, 1, result.Violations)
+	assert.Equal(t, 0, result.BaselinedCount)
+
+	// Get the fingerprint for baselining
+	scanResult, err := server.runScan(context.Background(), ScanInput{Path: ".", Engines: []string{"gosec"}}, nil)
+	require.NoError(t, err)
+	require.Len(t, scanResult.Findings, 1)
+	fingerprint := scanResult.Findings[0].Fingerprint
+
+	// Create baseline with the HIGH severity finding using correct JSON structure
+	baselineData := `{
+		"version": "1",
+		"scope": {"project": "."},
+		"fingerprints": [
+			{"fingerprint": "` + fingerprint + `", "rule_id": "G401", "engine_id": "gosec", "file": "crypto.go", "reason": "Accepted risk"}
+		]
+	}`
+	err = os.WriteFile(baselinePath, []byte(baselineData), 0644)
+	require.NoError(t, err)
+
+	// Re-check with baseline - should PASS (all violations are baselined)
+	result2, err := server.handlePolicyCheck(context.Background(), PolicyCheckInput{Path: "."})
+	require.NoError(t, err)
+	assert.Equal(t, "PASS", result2.Decision)
+	assert.Equal(t, 0, result2.Violations)
+	assert.Equal(t, 1, result2.BaselinedCount)
+	assert.Contains(t, result2.Messages, "1 findings filtered by baseline")
+	assert.Contains(t, result2.Messages, "All findings are baselined")
+}
+
+func TestServer_RunScan_NoBaseline(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.Engines.Gosec.Enabled = true
+	cfg.Baseline.Path = "/nonexistent/baseline.json"
+	cfg.MCP.MaxFindings = -1
+
+	registry := mocks.NewMockRegistry()
+	mockEngine := mocks.NewMockEngine(ports.EngineGosec)
+	mockEngine.CapabilitiesValue = []ports.Capability{ports.CapabilitySAST}
+	mockEngine.WithFindings([]ports.RawFinding{
+		{RuleID: "G401", Message: "Issue", Severity: "HIGH", File: "a.go", StartLine: 10},
+	})
+	registry.Register(mockEngine)
+
+	server := NewServerWithRegistry(cfg, registry, "test")
+	input := ScanInput{Path: ".", Engines: []string{"gosec"}}
+
+	result, err := server.runScan(context.Background(), input, nil)
+	require.NoError(t, err)
+	assert.Equal(t, 1, result.TotalCount)
+	assert.Equal(t, 0, result.BaselinedCount)
+	assert.Len(t, result.Findings, 1)
+}
+
+func TestScanResult_BaselinedCount_Structure(t *testing.T) {
+	result := &ScanResult{
+		Status:         "completed",
+		TotalCount:     5,
+		ShownCount:     5,
+		BaselinedCount: 10,
+		CriticalCount:  1,
+		HighCount:      2,
+		MediumCount:    1,
+		LowCount:       1,
+	}
+
+	assert.Equal(t, 10, result.BaselinedCount)
+	assert.Equal(t, 5, result.TotalCount)
+}
+
+func TestPolicyCheckResult_BaselinedCount_Structure(t *testing.T) {
+	result := &PolicyCheckResult{
+		Decision:       "PASS",
+		FailThreshold:  "HIGH",
+		WarnThreshold:  "MEDIUM",
+		Violations:     0,
+		Warnings:       0,
+		BaselinedCount: 15,
+		Messages:       []string{"All findings are baselined"},
+	}
+
+	assert.Equal(t, 15, result.BaselinedCount)
+	assert.Equal(t, "PASS", result.Decision)
 }

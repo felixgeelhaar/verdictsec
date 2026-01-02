@@ -9,7 +9,8 @@ import (
 	"github.com/felixgeelhaar/mcp-go"
 	"github.com/felixgeelhaar/verdictsec/internal/application/ports"
 	"github.com/felixgeelhaar/verdictsec/internal/application/usecases"
-	"github.com/felixgeelhaar/verdictsec/internal/domain/policy"
+	domainbaseline "github.com/felixgeelhaar/verdictsec/internal/domain/baseline"
+	"github.com/felixgeelhaar/verdictsec/internal/domain/finding"
 	"github.com/felixgeelhaar/verdictsec/internal/domain/services"
 	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/baseline"
 	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/config"
@@ -140,6 +141,7 @@ type ScanResult struct {
 	Status         string          `json:"status"`
 	TotalCount     int             `json:"total_count"`
 	ShownCount     int             `json:"shown_count"`
+	BaselinedCount int             `json:"baselined_count"`
 	Truncated      bool            `json:"truncated"`
 	CriticalCount  int             `json:"critical_count"`
 	HighCount      int             `json:"high_count"`
@@ -244,16 +246,29 @@ func (s *Server) runScan(ctx context.Context, input ScanInput, forceEngines []po
 	// Get all findings
 	allFindings := output.Assessment.Findings()
 
-	// Apply truncation based on MCP config
+	// Load baseline and filter out baselined findings
+	bl := s.loadBaseline()
+	var activeFindings []*finding.Finding
+	var baselinedCount int
+
+	for _, f := range allFindings {
+		if bl != nil && bl.Contains(f) {
+			baselinedCount++
+		} else {
+			activeFindings = append(activeFindings, f)
+		}
+	}
+
+	// Apply truncation to active (non-baselined) findings
 	mcpCfg := s.config.GetMCPConfig()
-	truncResult := s.truncation.Truncate(allFindings, services.TruncationConfig{
+	truncResult := s.truncation.Truncate(activeFindings, services.TruncationConfig{
 		MaxFindings: mcpCfg.MaxFindings,
 		Strategy:    services.TruncateStrategy(mcpCfg.TruncateStrategy),
 	})
 
-	// Count severities from ALL findings (for accurate totals)
+	// Count severities from active findings only (for accurate totals)
 	var criticalCount, highCount, mediumCount, lowCount int
-	for _, f := range allFindings {
+	for _, f := range activeFindings {
 		switch f.EffectiveSeverity().String() {
 		case "CRITICAL":
 			criticalCount++
@@ -268,16 +283,17 @@ func (s *Server) runScan(ctx context.Context, input ScanInput, forceEngines []po
 
 	// Build result with truncated findings
 	result := &ScanResult{
-		Status:        "completed",
-		TotalCount:   truncResult.TotalCount,
-		ShownCount:   truncResult.ShownCount,
-		Truncated:    truncResult.Truncated,
-		CriticalCount: criticalCount,
-		HighCount:    highCount,
-		MediumCount:  mediumCount,
-		LowCount:     lowCount,
-		Duration:     time.Since(start).String(),
-		Findings:     make([]FindingInfo, 0, len(truncResult.Findings)),
+		Status:         "completed",
+		TotalCount:    truncResult.TotalCount,
+		ShownCount:    truncResult.ShownCount,
+		BaselinedCount: baselinedCount,
+		Truncated:     truncResult.Truncated,
+		CriticalCount:  criticalCount,
+		HighCount:     highCount,
+		MediumCount:   mediumCount,
+		LowCount:      lowCount,
+		Duration:      time.Since(start).String(),
+		Findings:      make([]FindingInfo, 0, len(truncResult.Findings)),
 	}
 
 	// Convert truncated findings to FindingInfo
@@ -314,6 +330,22 @@ func (s *Server) runScan(ctx context.Context, input ScanInput, forceEngines []po
 	}
 
 	return result, nil
+}
+
+// loadBaseline loads the baseline from the configured path.
+// Returns nil if baseline doesn't exist or cannot be loaded.
+func (s *Server) loadBaseline() *domainbaseline.Baseline {
+	blPath := s.config.Baseline.Path
+	if blPath == "" {
+		blPath = ".verdict/baseline.json"
+	}
+
+	store := baseline.NewStoreWithPath(blPath)
+	bl, err := store.Load()
+	if err != nil {
+		return nil
+	}
+	return bl
 }
 
 // BaselineAddInput defines input for adding to baseline.
@@ -416,12 +448,13 @@ type PolicyCheckInput struct {
 
 // PolicyCheckResult represents the result of a policy check.
 type PolicyCheckResult struct {
-	Decision     string   `json:"decision"`
-	FailThreshold string  `json:"fail_threshold"`
-	WarnThreshold string  `json:"warn_threshold"`
-	Violations   int      `json:"violations"`
-	Warnings     int      `json:"warnings"`
-	Messages     []string `json:"messages"`
+	Decision       string   `json:"decision"`
+	FailThreshold  string   `json:"fail_threshold"`
+	WarnThreshold  string   `json:"warn_threshold"`
+	Violations     int      `json:"violations"`
+	Warnings       int      `json:"warnings"`
+	BaselinedCount int      `json:"baselined_count"`
+	Messages       []string `json:"messages"`
 }
 
 func (s *Server) handlePolicyCheck(ctx context.Context, input PolicyCheckInput) (*PolicyCheckResult, error) {
@@ -462,29 +495,66 @@ func (s *Server) handlePolicyCheck(ctx context.Context, input PolicyCheckInput) 
 		return nil, fmt.Errorf("scan failed: %w", err)
 	}
 
-	// Evaluate policy
-	policyUseCase := usecases.NewEvaluatePolicyUseCase(writer)
+	// Load baseline and filter out baselined findings
+	bl := s.loadBaseline()
+	allFindings := scanOutput.Assessment.Findings()
+	var activeFindings []*finding.Finding
+	var baselinedCount int
 
-	pol := s.config.ToDomainPolicy()
-	evalInput := usecases.EvaluatePolicyInput{
-		Assessment: scanOutput.Assessment,
-		Policy:     &pol,
-		Mode:       policy.ModeCI,
+	for _, f := range allFindings {
+		if bl != nil && bl.Contains(f) {
+			baselinedCount++
+		} else {
+			activeFindings = append(activeFindings, f)
+		}
 	}
 
-	evalOutput := policyUseCase.Execute(ctx, evalInput)
+	// Count violations and warnings from active findings only
+	var violations, warnings int
+	pol := s.config.ToDomainPolicy()
 
-	// Calculate violations and warnings from stats
-	violations := evalOutput.Stats.CriticalCount() + evalOutput.Stats.HighCount()
-	warnings := evalOutput.Stats.MediumCount()
+	for _, f := range activeFindings {
+		sev := f.EffectiveSeverity()
+		if sev >= pol.Threshold.FailOn {
+			violations++
+		} else if sev >= pol.Threshold.WarnOn {
+			warnings++
+		}
+	}
+
+	// Determine decision based on active findings
+	decision := "PASS"
+	if violations > 0 {
+		decision = "FAIL"
+	} else if warnings > 0 {
+		decision = "WARN"
+	}
+
+	// Build messages
+	var messages []string
+	if baselinedCount > 0 {
+		messages = append(messages, fmt.Sprintf("%d findings filtered by baseline", baselinedCount))
+	}
+	if violations > 0 {
+		messages = append(messages, fmt.Sprintf("%d findings at or above %s threshold", violations, pol.Threshold.FailOn.String()))
+	}
+	if warnings > 0 {
+		messages = append(messages, fmt.Sprintf("%d findings at %s threshold", warnings, pol.Threshold.WarnOn.String()))
+	}
+	if len(activeFindings) == 0 && baselinedCount == 0 {
+		messages = append(messages, "No security findings detected")
+	} else if len(activeFindings) == 0 && baselinedCount > 0 {
+		messages = append(messages, "All findings are baselined")
+	}
 
 	result := &PolicyCheckResult{
-		Decision:      evalOutput.Decision.String(),
-		FailThreshold: pol.Threshold.FailOn.String(),
-		WarnThreshold: pol.Threshold.WarnOn.String(),
-		Violations:    violations,
-		Warnings:      warnings,
-		Messages:      append([]string{}, evalOutput.Result.Reasons...),
+		Decision:       decision,
+		FailThreshold:  pol.Threshold.FailOn.String(),
+		WarnThreshold:  pol.Threshold.WarnOn.String(),
+		Violations:     violations,
+		Warnings:       warnings,
+		BaselinedCount: baselinedCount,
+		Messages:       messages,
 	}
 
 	return result, nil
