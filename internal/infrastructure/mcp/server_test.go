@@ -310,6 +310,7 @@ func TestServer_RunScan_NoEngines(t *testing.T) {
 	cfg.Engines.Gitleaks.Enabled = false
 	cfg.Engines.CycloneDX.Enabled = false
 	cfg.Engines.Syft.Enabled = false
+	cfg.Engines.Staticcheck.Enabled = false
 
 	server := NewServer(cfg)
 
@@ -319,7 +320,7 @@ func TestServer_RunScan_NoEngines(t *testing.T) {
 
 	_, err := server.runScan(context.Background(), input, nil)
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no engines available")
 }
 
@@ -330,6 +331,7 @@ func TestServer_RunScan_WithSpecifiedEngines(t *testing.T) {
 	cfg.Engines.Gitleaks.Enabled = false
 	cfg.Engines.CycloneDX.Enabled = false
 	cfg.Engines.Syft.Enabled = false
+	cfg.Engines.Staticcheck.Enabled = false
 
 	server := NewServer(cfg)
 
@@ -352,6 +354,7 @@ func TestServer_RunScan_StrictModeError(t *testing.T) {
 	cfg.Engines.Gitleaks.Enabled = false
 	cfg.Engines.CycloneDX.Enabled = false
 	cfg.Engines.Syft.Enabled = false
+	cfg.Engines.Staticcheck.Enabled = false
 
 	server := NewServer(cfg)
 
@@ -373,6 +376,7 @@ func TestServer_HandleBaselineAdd_Error(t *testing.T) {
 	cfg.Engines.Gitleaks.Enabled = false
 	cfg.Engines.CycloneDX.Enabled = false
 	cfg.Engines.Syft.Enabled = false
+	cfg.Engines.Staticcheck.Enabled = false
 
 	server := NewServer(cfg)
 
@@ -397,6 +401,7 @@ func TestServer_HandlePolicyCheck_Error(t *testing.T) {
 	cfg.Engines.Gitleaks.Enabled = false
 	cfg.Engines.CycloneDX.Enabled = false
 	cfg.Engines.Syft.Enabled = false
+	cfg.Engines.Staticcheck.Enabled = false
 
 	server := NewServer(cfg)
 
@@ -419,6 +424,7 @@ func TestServer_RunScan_DefaultPath(t *testing.T) {
 	cfg.Engines.Gitleaks.Enabled = false
 	cfg.Engines.CycloneDX.Enabled = false
 	cfg.Engines.Syft.Enabled = false
+	cfg.Engines.Staticcheck.Enabled = false
 
 	server := NewServer(cfg)
 
@@ -439,6 +445,7 @@ func TestServer_RunScan_InputEnginesParsing(t *testing.T) {
 	cfg.Engines.Gitleaks.Enabled = false
 	cfg.Engines.CycloneDX.Enabled = false
 	cfg.Engines.Syft.Enabled = false
+	cfg.Engines.Staticcheck.Enabled = false
 
 	server := NewServer(cfg)
 

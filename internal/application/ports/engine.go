@@ -16,6 +16,7 @@ const (
 	EngineGitleaks    EngineID = "gitleaks"
 	EngineCycloneDX   EngineID = "cyclonedx-gomod"
 	EngineSyft        EngineID = "syft"
+	EngineStaticcheck EngineID = "staticcheck"
 )
 
 // Capability represents what a scanner can do.

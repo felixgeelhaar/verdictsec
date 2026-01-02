@@ -285,6 +285,8 @@ func TestDetermineEngines_AllDisabled(t *testing.T) {
 	cfg.Engines.Govulncheck.Enabled = false
 	cfg.Engines.Gitleaks.Enabled = false
 	cfg.Engines.CycloneDX.Enabled = false
+	cfg.Engines.Syft.Enabled = false
+	cfg.Engines.Staticcheck.Enabled = false
 
 	// Reset global flags
 	oldInclude := includeEngines
@@ -637,6 +639,8 @@ engines:
     enabled: false
   syft:
     enabled: false
+  staticcheck:
+    enabled: false
 `)
 	require.NoError(t, os.WriteFile(configPath, content, 0644))
 
@@ -674,6 +678,8 @@ engines:
   cyclonedx-gomod:
     enabled: false
   syft:
+    enabled: false
+  staticcheck:
     enabled: false
 `)
 	require.NoError(t, os.WriteFile(configPath, content, 0644))
@@ -713,6 +719,8 @@ engines:
     enabled: false
   syft:
     enabled: false
+  staticcheck:
+    enabled: false
 `)
 	require.NoError(t, os.WriteFile(configPath, content, 0644))
 
@@ -750,6 +758,8 @@ engines:
   cyclonedx-gomod:
     enabled: false
   syft:
+    enabled: false
+  staticcheck:
     enabled: false
 `)
 	require.NoError(t, os.WriteFile(configPath, content, 0644))
@@ -1032,7 +1042,7 @@ func TestDetermineEngines_ExcludeAll(t *testing.T) {
 	oldInclude := includeEngines
 	oldExclude := excludeEngines
 	includeEngines = nil
-	excludeEngines = []string{"gosec", "govulncheck", "gitleaks", "cyclonedx-gomod"}
+	excludeEngines = []string{"gosec", "govulncheck", "gitleaks", "cyclonedx-gomod", "syft", "staticcheck"}
 	defer func() {
 		includeEngines = oldInclude
 		excludeEngines = oldExclude
@@ -1547,6 +1557,8 @@ func TestDetermineEngines_NoneEnabled(t *testing.T) {
 	cfg.Engines.Govulncheck.Enabled = false
 	cfg.Engines.Gitleaks.Enabled = false
 	cfg.Engines.CycloneDX.Enabled = false
+	cfg.Engines.Syft.Enabled = false
+	cfg.Engines.Staticcheck.Enabled = false
 
 	// Save and restore global flags
 	oldInclude := includeEngines
@@ -1569,6 +1581,8 @@ func TestDetermineEngines_AllEnabledNoFilters(t *testing.T) {
 	cfg.Engines.Govulncheck.Enabled = true
 	cfg.Engines.Gitleaks.Enabled = true
 	cfg.Engines.CycloneDX.Enabled = true
+	cfg.Engines.Syft.Enabled = true
+	cfg.Engines.Staticcheck.Enabled = true
 
 	// Save and restore global flags
 	oldInclude := includeEngines
@@ -1582,11 +1596,13 @@ func TestDetermineEngines_AllEnabledNoFilters(t *testing.T) {
 
 	engines := determineEngines(cfg)
 
-	assert.Len(t, engines, 4)
+	assert.Len(t, engines, 6)
 	assert.Contains(t, engines, "gosec")
 	assert.Contains(t, engines, "govulncheck")
 	assert.Contains(t, engines, "gitleaks")
 	assert.Contains(t, engines, "cyclonedx-gomod")
+	assert.Contains(t, engines, "syft")
+	assert.Contains(t, engines, "staticcheck")
 }
 
 func TestApplyThresholdOverrides_BothChanged(t *testing.T) {

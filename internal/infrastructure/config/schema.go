@@ -46,6 +46,7 @@ type EnginesConfig struct {
 	Gitleaks    EngineSettings `yaml:"gitleaks" json:"gitleaks"`
 	CycloneDX   EngineSettings `yaml:"cyclonedx-gomod" json:"cyclonedx-gomod"`
 	Syft        EngineSettings `yaml:"syft" json:"syft"`
+	Staticcheck EngineSettings `yaml:"staticcheck" json:"staticcheck"`
 }
 
 // EngineSettings holds settings for a single engine.
@@ -115,6 +116,12 @@ func DefaultConfig() *Config {
 				Exclude:  []string{},
 				Settings: map[string]string{},
 			},
+			Staticcheck: EngineSettings{
+				Enabled:  true,
+				Severity: "INFO",
+				Exclude:  []string{},
+				Settings: map[string]string{},
+			},
 		},
 		Output: OutputConfig{
 			Format:    "console",
@@ -139,6 +146,7 @@ func (c *Config) ToPortsConfig() ports.Config {
 			ports.EngineGitleaks:    c.toEngineConfig(c.Engines.Gitleaks),
 			ports.EngineCycloneDX:   c.toEngineConfig(c.Engines.CycloneDX),
 			ports.EngineSyft:        c.toEngineConfig(c.Engines.Syft),
+			ports.EngineStaticcheck: c.toEngineConfig(c.Engines.Staticcheck),
 		},
 		Output: ports.OutputConfig{
 			Format:    c.GetOutputFormat(),
@@ -250,6 +258,8 @@ func (c *Config) EngineConfig(engineID string) ports.EngineConfig {
 		return c.toEngineConfig(c.Engines.CycloneDX)
 	case "syft":
 		return c.toEngineConfig(c.Engines.Syft)
+	case "staticcheck":
+		return c.toEngineConfig(c.Engines.Staticcheck)
 	default:
 		return ports.EngineConfig{Enabled: false}
 	}

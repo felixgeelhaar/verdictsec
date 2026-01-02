@@ -43,6 +43,7 @@ This command orchestrates multiple security tools:
   - govulncheck: Vulnerability scanning for dependencies
   - gitleaks: Secret detection
   - cyclonedx-gomod: SBOM generation
+  - staticcheck: Dead code detection
 
 Examples:
   verdict scan                     # Scan current directory
@@ -229,6 +230,12 @@ func determineEngines(cfg *config.Config) []string {
 	}
 	if cfg.Engines.CycloneDX.Enabled {
 		engineIDs = append(engineIDs, "cyclonedx-gomod")
+	}
+	if cfg.Engines.Staticcheck.Enabled {
+		engineIDs = append(engineIDs, "staticcheck")
+	}
+	if cfg.Engines.Syft.Enabled {
+		engineIDs = append(engineIDs, "syft")
 	}
 
 	// Apply exclusions

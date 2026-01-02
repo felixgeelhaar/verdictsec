@@ -6,6 +6,7 @@ import (
 	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/engines/gitleaks"
 	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/engines/gosec"
 	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/engines/govulncheck"
+	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/engines/staticcheck"
 )
 
 // NormalizerConfig holds severity mappings per engine.
@@ -13,6 +14,7 @@ type NormalizerConfig struct {
 	GosecMappings       map[string]finding.Severity
 	GovulncheckMappings map[string]finding.Severity
 	GitleaksMappings    map[string]finding.Severity
+	StaticcheckMappings map[string]finding.Severity
 }
 
 // CompositeNormalizer dispatches to the appropriate engine normalizer.
@@ -20,6 +22,7 @@ type CompositeNormalizer struct {
 	gosecNorm       *gosec.Normalizer
 	govulncheckNorm *govulncheck.Normalizer
 	gitleaksNorm    *gitleaks.Normalizer
+	staticcheckNorm *staticcheck.Normalizer
 }
 
 // NewCompositeNormalizer creates a normalizer that handles all engines.
@@ -28,6 +31,7 @@ func NewCompositeNormalizer() *CompositeNormalizer {
 		gosecNorm:       gosec.NewNormalizer(),
 		govulncheckNorm: govulncheck.NewNormalizer(),
 		gitleaksNorm:    gitleaks.NewNormalizer(),
+		staticcheckNorm: staticcheck.NewNormalizer(),
 	}
 }
 
@@ -37,6 +41,7 @@ func NewCompositeNormalizerWithConfig(cfg NormalizerConfig) *CompositeNormalizer
 		gosecNorm:       gosec.NewNormalizerWithOverrides(cfg.GosecMappings),
 		govulncheckNorm: govulncheck.NewNormalizerWithOverrides(cfg.GovulncheckMappings),
 		gitleaksNorm:    gitleaks.NewNormalizerWithOverrides(cfg.GitleaksMappings),
+		staticcheckNorm: staticcheck.NewNormalizerWithOverrides(cfg.StaticcheckMappings),
 	}
 }
 
@@ -53,6 +58,9 @@ func NewCompositeNormalizerFromPortsConfig(cfg ports.Config) *CompositeNormalize
 	if gitleaksCfg, ok := cfg.Engines[ports.EngineGitleaks]; ok && gitleaksCfg.SeverityMapping != nil {
 		normCfg.GitleaksMappings = gitleaksCfg.SeverityMapping
 	}
+	if staticcheckCfg, ok := cfg.Engines[ports.EngineStaticcheck]; ok && staticcheckCfg.SeverityMapping != nil {
+		normCfg.StaticcheckMappings = staticcheckCfg.SeverityMapping
+	}
 
 	return NewCompositeNormalizerWithConfig(normCfg)
 }
@@ -67,8 +75,10 @@ func (n *CompositeNormalizer) Normalize(engineID ports.EngineID, raw ports.RawFi
 		return n.govulncheckNorm.Normalize(engineID, raw)
 	case ports.EngineGitleaks:
 		return n.gitleaksNorm.Normalize(engineID, raw)
-	case ports.EngineCycloneDX:
-		// CycloneDX produces SBOM, not findings - return nil
+	case ports.EngineStaticcheck:
+		return n.staticcheckNorm.Normalize(engineID, raw)
+	case ports.EngineCycloneDX, ports.EngineSyft:
+		// CycloneDX and Syft produce SBOM, not findings - return nil
 		return nil
 	default:
 		// Unknown engine - create a basic finding
