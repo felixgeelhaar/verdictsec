@@ -1,0 +1,33 @@
+# Example GitLab CI Configuration
+#
+# Copy this file to .gitlab-ci.yml in your repository.
+#
+# This configuration includes VerdictSec security scanning using
+# the remote template from the VerdictSec repository.
+#
+
+include:
+  - remote: 'https://raw.githubusercontent.com/felixgeelhaar/verdictsec/main/.gitlab/templates/verdictsec.gitlab-ci.yml'
+
+# Override default variables if needed
+variables:
+  GO_VERSION: "1.22"
+  VERDICTSEC_STRICT: "false"  # Set to "true" to fail on any finding
+
+stages:
+  - test
+  - security
+  - deploy
+
+# Your existing jobs...
+test:
+  stage: test
+  image: golang:${GO_VERSION}
+  script:
+    - go test -v ./...
+
+# VerdictSec jobs are automatically included from the template:
+# - verdictsec-scan: Full scan on main branch and tags
+# - verdictsec-mr-check: Lightweight check for merge requests
+# - verdictsec-scheduled: Weekly scheduled scan
+# - verdictsec-audit: Manual comprehensive audit

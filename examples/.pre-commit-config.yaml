@@ -1,0 +1,47 @@
+# Example .pre-commit-config.yaml for VerdictSec
+#
+# Copy this file to your repository root as .pre-commit-config.yaml
+#
+# Install pre-commit: pip install pre-commit
+# Install hooks: pre-commit install
+#
+# Available hooks:
+#   - verdict-secrets: Fast secrets detection (pre-commit)
+#   - verdict-sast: SAST analysis (pre-commit)
+#   - verdict-vuln: Vulnerability scan (pre-commit, pre-push)
+#   - verdict-scan: Full security scan (pre-push)
+#   - verdict-ci: CI mode with strict exit codes (pre-push)
+#
+repos:
+  # VerdictSec security hooks
+  - repo: https://github.com/felixgeelhaar/verdictsec
+    rev: v0.5.3  # Use the latest version
+    hooks:
+      # Fast checks for every commit
+      - id: verdict-secrets
+        stages: [pre-commit]
+
+      - id: verdict-sast
+        stages: [pre-commit]
+
+      # Full scan before push (optional, can be slow)
+      # Uncomment to enable:
+      # - id: verdict-scan
+      #   stages: [pre-push]
+
+  # Other recommended hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+
+  # Go-specific hooks
+  - repo: https://github.com/dnephin/pre-commit-golang
+    rev: v0.5.1
+    hooks:
+      - id: go-fmt
+      - id: go-vet
+      - id: go-mod-tidy

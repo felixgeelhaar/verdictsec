@@ -1,0 +1,108 @@
+# VerdictSec Security Scan Workflow
+#
+# Full security scan for Go projects with SARIF upload to GitHub Code Scanning.
+#
+# Usage: Copy this file to your repository as .github/workflows/security.yml
+#
+# Features:
+# - SAST analysis (gosec, staticcheck)
+# - Dependency vulnerability scanning (govulncheck)
+# - Secrets detection (gitleaks)
+# - SARIF upload to GitHub Code Scanning
+# - Baseline support for accepted findings
+# - JSON artifact upload
+#
+name: Security Scan
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  schedule:
+    # Run weekly on Monday at 9am UTC
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+env:
+  GO_VERSION: '1.22'
+  VERDICTSEC_VERSION: 'latest'
+
+jobs:
+  security-scan:
+    name: VerdictSec Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for baseline comparison
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Install VerdictSec
+        run: |
+          go install github.com/felixgeelhaar/verdictsec/cmd/verdict@${{ env.VERDICTSEC_VERSION }}
+          echo "$HOME/go/bin" >> $GITHUB_PATH
+
+      - name: Install security tools
+        run: |
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          go install github.com/gitleaks/gitleaks/v8@latest
+          go install honnef.co/go/tools/cmd/staticcheck@latest
+
+      - name: Run security scan
+        id: scan
+        run: |
+          verdict scan --output json --output sarif > results.json 2>&1 || EXIT_CODE=$?
+          echo "exit_code=${EXIT_CODE:-0}" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: Upload SARIF to GitHub Code Scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: verdict-results.sarif
+        continue-on-error: true
+
+      - name: Upload scan results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verdictsec-results
+          path: |
+            results.json
+            verdict-results.sarif
+          retention-days: 30
+
+      - name: Check scan result
+        if: steps.scan.outputs.exit_code == '1'
+        run: |
+          echo "::error::Security scan failed with policy violations"
+          echo "See the uploaded artifacts or Code Scanning alerts for details."
+          exit 1
+
+      - name: Scan summary
+        if: always()
+        run: |
+          echo "## VerdictSec Security Scan Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.scan.outputs.exit_code }}" == "0" ]; then
+            echo "✅ **PASSED** - No policy violations detected" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ steps.scan.outputs.exit_code }}" == "1" ]; then
+            echo "❌ **FAILED** - Policy violations detected" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ **ERROR** - Scan encountered an error" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "See [Code Scanning alerts](../../security/code-scanning) for details." >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,56 @@
+# Example GitHub Actions Security Workflow
+#
+# Copy this file to .github/workflows/security.yml in your repository.
+#
+# This workflow runs VerdictSec security scans on:
+# - Push to main/master
+# - Pull requests
+# - Weekly schedule
+#
+# Results are uploaded to GitHub Code Scanning and as artifacts.
+#
+name: Security
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  schedule:
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  security-scan:
+    name: VerdictSec Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+
+      - name: Install tools
+        run: |
+          go install github.com/felixgeelhaar/verdictsec/cmd/verdict@latest
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          go install github.com/gitleaks/gitleaks/v8@latest
+          go install honnef.co/go/tools/cmd/staticcheck@latest
+
+      - name: Run security scan
+        run: verdict scan --output sarif
+        continue-on-error: true
+
+      - name: Upload SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: verdict-results.sarif
+        if: always()

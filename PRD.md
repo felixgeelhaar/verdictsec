@@ -257,11 +257,13 @@ Originally Not Required for MVP (Now Implemented)
 
 ✅ MCP server
 
-⏳ SARIF normalization (pending)
+✅ SARIF output (internal/infrastructure/writers/sarif.go)
+
+✅ Pre-commit hooks (.pre-commit-hooks.yaml + scripts/hooks/)
+
+✅ CI templates (GitHub Actions + GitLab CI)
 
 ⏳ AI features (pending)
-
-⏳ Pre-commit hooks (pending)
 
 ❌ SaaS components (not planned)
 
@@ -271,15 +273,15 @@ Originally Not Required for MVP (Now Implemented)
 
 ✅ MCP server integration
 
+✅ SARIF output normalization
+
+✅ CI templates (GitHub Actions, GitLab)
+
+✅ Pre-commit hooks
+
 ⏳ SBOM diffing between releases
 
-⏳ SARIF output normalization
-
 ⏳ AI-assisted explanations
-
-⏳ CI templates (GitHub Actions, GitLab)
-
-⏳ Pre-commit hooks
 
 7. Non-Goals (Explicit)
 
@@ -374,11 +376,15 @@ Phase 2: AI advisory features + MCP 🔄 IN PROGRESS
   - ✅ MCP Server implemented (verdict mcp serve)
   - ⏳ AI advisory features (pending)
 
-Phase 3: Ecosystem integrations (IDE, hooks, templates) 🔄 IN PROGRESS
+Phase 3: Ecosystem integrations (IDE, hooks, templates) ✅ COMPLETE
   - ✅ GitHub Pages landing page
   - ✅ Homebrew tap distribution
-  - ⏳ Pre-commit hooks (pending)
-  - ⏳ CI templates (pending)
+  - ✅ Pre-commit hooks (.pre-commit-hooks.yaml + scripts/hooks/)
+  - ✅ CI templates (GitHub Actions + GitLab CI)
+
+Phase 4: Advanced features ⏳ PLANNED
+  - ⏳ SBOM diffing between releases
+  - ⏳ AI-assisted explanations (opt-in, advisory-only)
 
 12. Summary
 

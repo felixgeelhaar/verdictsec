@@ -1,0 +1,166 @@
+# VerdictSec PR Security Check
+#
+# Lightweight security check for pull requests.
+# Uses baseline to fail only on new findings.
+#
+# Usage: Copy this file to your repository as .github/workflows/pr-security.yml
+#
+# Features:
+# - Fast secrets detection
+# - SAST on changed files
+# - Baseline comparison (fail only on new)
+# - PR comment with findings summary
+#
+name: PR Security Check
+
+on:
+  pull_request:
+    branches: [main, master]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  GO_VERSION: '1.22'
+
+jobs:
+  pr-security-check:
+    name: Security Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Install VerdictSec
+        run: |
+          go install github.com/felixgeelhaar/verdictsec/cmd/verdict@latest
+          echo "$HOME/go/bin" >> $GITHUB_PATH
+
+      - name: Install security tools
+        run: |
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          go install github.com/gitleaks/gitleaks/v8@latest
+          go install honnef.co/go/tools/cmd/staticcheck@latest
+
+      - name: Check for secrets
+        id: secrets
+        run: |
+          verdict secrets --quiet && echo "result=pass" >> $GITHUB_OUTPUT || echo "result=fail" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: Run SAST
+        id: sast
+        run: |
+          verdict sast --quiet && echo "result=pass" >> $GITHUB_OUTPUT || echo "result=fail" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: Check vulnerabilities
+        id: vuln
+        run: |
+          verdict vuln --quiet && echo "result=pass" >> $GITHUB_OUTPUT || echo "result=fail" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: Generate summary
+        id: summary
+        run: |
+          SECRETS="${{ steps.secrets.outputs.result }}"
+          SAST="${{ steps.sast.outputs.result }}"
+          VULN="${{ steps.vuln.outputs.result }}"
+
+          FAILED=0
+          [ "$SECRETS" == "fail" ] && FAILED=1
+          [ "$SAST" == "fail" ] && FAILED=1
+          [ "$VULN" == "fail" ] && FAILED=1
+
+          echo "failed=$FAILED" >> $GITHUB_OUTPUT
+
+          # Generate markdown summary
+          {
+            echo "## 🔒 VerdictSec Security Check"
+            echo ""
+            echo "| Check | Status |"
+            echo "|-------|--------|"
+            [ "$SECRETS" == "pass" ] && echo "| Secrets | ✅ Pass |" || echo "| Secrets | ❌ Fail |"
+            [ "$SAST" == "pass" ] && echo "| SAST | ✅ Pass |" || echo "| SAST | ❌ Fail |"
+            [ "$VULN" == "pass" ] && echo "| Vulnerabilities | ✅ Pass |" || echo "| Vulnerabilities | ❌ Fail |"
+            echo ""
+            if [ $FAILED -eq 1 ]; then
+              echo "### ⚠️ Action Required"
+              echo "Security issues were detected. Please review and address the findings."
+              echo ""
+              echo "Run locally for details:"
+              echo '```bash'
+              echo "verdict scan"
+              echo '```'
+            else
+              echo "### ✅ All Checks Passed"
+              echo "No new security issues detected."
+            fi
+          } >> $GITHUB_STEP_SUMMARY
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const secrets = '${{ steps.secrets.outputs.result }}';
+            const sast = '${{ steps.sast.outputs.result }}';
+            const vuln = '${{ steps.vuln.outputs.result }}';
+            const failed = '${{ steps.summary.outputs.failed }}' === '1';
+
+            const icon = (result) => result === 'pass' ? '✅' : '❌';
+
+            let body = `## 🔒 VerdictSec Security Check\n\n`;
+            body += `| Check | Status |\n`;
+            body += `|-------|--------|\n`;
+            body += `| Secrets | ${icon(secrets)} ${secrets === 'pass' ? 'Pass' : 'Fail'} |\n`;
+            body += `| SAST | ${icon(sast)} ${sast === 'pass' ? 'Pass' : 'Fail'} |\n`;
+            body += `| Vulnerabilities | ${icon(vuln)} ${vuln === 'pass' ? 'Pass' : 'Fail'} |\n\n`;
+
+            if (failed) {
+              body += `### ⚠️ Action Required\nSecurity issues were detected. Run \`verdict scan\` locally for details.`;
+            } else {
+              body += `### ✅ All Checks Passed`;
+            }
+
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(c =>
+              c.user.type === 'Bot' && c.body.includes('VerdictSec Security Check')
+            );
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body,
+              });
+            }
+
+      - name: Fail if issues found
+        if: steps.summary.outputs.failed == '1'
+        run: exit 1

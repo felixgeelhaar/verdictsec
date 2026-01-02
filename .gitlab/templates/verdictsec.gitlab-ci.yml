@@ -1,0 +1,130 @@
+# VerdictSec GitLab CI Template
+#
+# Security scanning for Go projects on GitLab CI.
+#
+# Usage in your .gitlab-ci.yml:
+#
+#   include:
+#     - remote: 'https://raw.githubusercontent.com/felixgeelhaar/verdictsec/main/.gitlab/templates/verdictsec.gitlab-ci.yml'
+#
+#   # Optional: Override variables
+#   variables:
+#     GO_VERSION: "1.22"
+#     VERDICTSEC_STRICT: "true"
+#
+# Or copy this file directly into your repository.
+#
+# Features:
+# - Full security scan (SAST + vulnerabilities + secrets)
+# - SAST report integration with GitLab Security Dashboard
+# - Artifact handling for scan results
+# - MR-specific checks with baseline support
+#
+
+variables:
+  GO_VERSION: "1.22"
+  VERDICTSEC_STRICT: "false"
+
+stages:
+  - security
+
+.verdictsec-base:
+  image: golang:${GO_VERSION}
+  before_script:
+    - go install github.com/felixgeelhaar/verdictsec/cmd/verdict@latest
+    - go install github.com/securego/gosec/v2/cmd/gosec@latest
+    - go install golang.org/x/vuln/cmd/govulncheck@latest
+    - go install github.com/gitleaks/gitleaks/v8@latest
+    - go install honnef.co/go/tools/cmd/staticcheck@latest
+    - export PATH=$PATH:$(go env GOPATH)/bin
+  cache:
+    key: go-modules-${CI_COMMIT_REF_SLUG}
+    paths:
+      - .go/pkg/mod/
+  variables:
+    GOPATH: ${CI_PROJECT_DIR}/.go
+
+# Full security scan for main branch and tags
+verdictsec-scan:
+  extends: .verdictsec-base
+  stage: security
+  script:
+    - |
+      if [ "$VERDICTSEC_STRICT" == "true" ]; then
+        verdict ci --output json > verdictsec-results.json
+      else
+        verdict scan --output json > verdictsec-results.json || true
+      fi
+  artifacts:
+    when: always
+    paths:
+      - verdictsec-results.json
+    reports:
+      sast: verdictsec-results.json
+    expire_in: 30 days
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+
+# Lightweight check for merge requests
+verdictsec-mr-check:
+  extends: .verdictsec-base
+  stage: security
+  script:
+    - echo "Running VerdictSec security check for MR..."
+    - |
+      FAILED=0
+
+      echo "=== Secrets Detection ==="
+      verdict secrets --quiet || FAILED=1
+
+      echo "=== SAST Analysis ==="
+      verdict sast --quiet || FAILED=1
+
+      echo "=== Vulnerability Scan ==="
+      verdict vuln --quiet || FAILED=1
+
+      if [ $FAILED -eq 1 ]; then
+        echo ""
+        echo "❌ Security issues detected. Please review and fix."
+        echo "Run 'verdict scan' locally for details."
+        exit 1
+      else
+        echo ""
+        echo "✅ All security checks passed."
+      fi
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+# Scheduled weekly scan
+verdictsec-scheduled:
+  extends: .verdictsec-base
+  stage: security
+  script:
+    - verdict scan --output json > verdictsec-results.json
+  artifacts:
+    when: always
+    paths:
+      - verdictsec-results.json
+    expire_in: 90 days
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+
+# Manual security audit
+verdictsec-audit:
+  extends: .verdictsec-base
+  stage: security
+  script:
+    - echo "Running comprehensive security audit..."
+    - verdict scan --output json --output sarif > verdictsec-results.json 2>&1
+    - echo ""
+    - echo "Audit complete. Check artifacts for detailed results."
+  artifacts:
+    when: always
+    paths:
+      - verdictsec-results.json
+      - verdict-results.sarif
+    expire_in: 90 days
+  rules:
+    - when: manual
+  allow_failure: true

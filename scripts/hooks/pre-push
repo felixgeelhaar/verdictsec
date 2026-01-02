@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+#
+# VerdictSec Pre-push Hook
+#
+# Comprehensive security scan before pushing:
+# - Full security scan (SAST + vulnerabilities + secrets)
+# - Respects baseline for existing findings
+# - Policy-based pass/fail decision
+#
+# Install: cp scripts/hooks/pre-push .git/hooks/pre-push
+# Or use: ./scripts/install-hooks.sh
+#
+set -euo pipefail
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+# Check if verdict is installed
+if ! command -v verdict &> /dev/null; then
+    echo -e "${RED}Error: verdict is not installed${NC}"
+    echo "Install with: brew install felixgeelhaar/tap/verdictsec"
+    echo "Or: go install github.com/felixgeelhaar/verdictsec/cmd/verdict@latest"
+    exit 1
+fi
+
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${CYAN}    VerdictSec Pre-push Security    ${NC}"
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+
+# Parse arguments to get remote and ref info
+REMOTE="$1"
+URL="$2"
+
+echo -e "\n${YELLOW}Remote:${NC} $REMOTE"
+echo -e "${YELLOW}URL:${NC} $URL"
+echo ""
+
+# Run full security scan
+echo -e "${YELLOW}▶ Running full security scan...${NC}\n"
+
+if verdict scan; then
+    echo ""
+    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${GREEN}    Security scan PASSED            ${NC}"
+    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    exit 0
+else
+    EXIT_CODE=$?
+    echo ""
+
+    if [ $EXIT_CODE -eq 1 ]; then
+        echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "${RED}    Security scan FAILED            ${NC}"
+        echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo ""
+        echo -e "Policy violations detected. Please address the findings."
+        echo ""
+        echo -e "Options:"
+        echo -e "  • Fix the issues and try again"
+        echo -e "  • Add accepted findings to baseline: ${CYAN}verdict baseline update${NC}"
+        echo -e "  • Skip this check: ${CYAN}git push --no-verify${NC} (not recommended)"
+        echo ""
+    elif [ $EXIT_CODE -eq 2 ]; then
+        echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "${YELLOW}    Security scan ERROR             ${NC}"
+        echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo ""
+        echo -e "Scan encountered an error. Check your configuration."
+        echo ""
+    fi
+
+    exit $EXIT_CODE
+fi

@@ -1,0 +1,53 @@
+# VerdictSec Pre-commit Hooks
+# https://pre-commit.com
+#
+# Usage in your .pre-commit-config.yaml:
+#   repos:
+#     - repo: https://github.com/felixgeelhaar/verdictsec
+#       rev: v0.5.3
+#       hooks:
+#         - id: verdict-secrets
+#         - id: verdict-sast
+
+- id: verdict-secrets
+  name: VerdictSec Secrets Detection
+  description: Scan for leaked credentials and secrets using gitleaks
+  entry: verdict secrets
+  language: system
+  pass_filenames: false
+  always_run: true
+  stages: [pre-commit]
+
+- id: verdict-sast
+  name: VerdictSec SAST
+  description: Static application security testing using gosec
+  entry: verdict sast
+  language: system
+  types: [go]
+  pass_filenames: false
+  stages: [pre-commit]
+
+- id: verdict-vuln
+  name: VerdictSec Vulnerability Scan
+  description: Dependency vulnerability scanning using govulncheck
+  entry: verdict vuln
+  language: system
+  files: (go\.mod|go\.sum)$
+  pass_filenames: false
+  stages: [pre-commit, pre-push]
+
+- id: verdict-scan
+  name: VerdictSec Full Scan
+  description: Complete security scan (SAST + vulnerabilities + secrets)
+  entry: verdict scan
+  language: system
+  pass_filenames: false
+  stages: [pre-push]
+
+- id: verdict-ci
+  name: VerdictSec CI Mode
+  description: Security scan with strict exit codes for CI/CD
+  entry: verdict ci
+  language: system
+  pass_filenames: false
+  stages: [pre-push]

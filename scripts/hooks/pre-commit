@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+#
+# VerdictSec Pre-commit Hook
+#
+# Fast security checks before committing:
+# - Secrets detection (always)
+# - SAST analysis (if Go files staged)
+#
+# Install: cp scripts/hooks/pre-commit .git/hooks/pre-commit
+# Or use: ./scripts/install-hooks.sh
+#
+set -euo pipefail
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+# Check if verdict is installed
+if ! command -v verdict &> /dev/null; then
+    echo -e "${RED}Error: verdict is not installed${NC}"
+    echo "Install with: brew install felixgeelhaar/tap/verdictsec"
+    echo "Or: go install github.com/felixgeelhaar/verdictsec/cmd/verdict@latest"
+    exit 1
+fi
+
+echo -e "${CYAN}━━━ VerdictSec Pre-commit Check ━━━${NC}"
+
+FAILED=0
+
+# Always run secrets detection (fast, catches credentials before commit)
+echo -e "\n${YELLOW}▶ Scanning for secrets...${NC}"
+if verdict secrets --quiet 2>/dev/null; then
+    echo -e "${GREEN}✓ No secrets detected${NC}"
+else
+    EXIT_CODE=$?
+    if [ $EXIT_CODE -eq 1 ]; then
+        echo -e "${RED}✗ Secrets detected! Please remove before committing.${NC}"
+        FAILED=1
+    elif [ $EXIT_CODE -eq 2 ]; then
+        echo -e "${YELLOW}⚠ Secrets scan encountered an error${NC}"
+    fi
+fi
+
+# Check if any Go files are staged
+GO_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep '\.go$' || true)
+
+if [ -n "$GO_FILES" ]; then
+    echo -e "\n${YELLOW}▶ Running SAST analysis...${NC}"
+    if verdict sast --quiet 2>/dev/null; then
+        echo -e "${GREEN}✓ SAST analysis passed${NC}"
+    else
+        EXIT_CODE=$?
+        if [ $EXIT_CODE -eq 1 ]; then
+            echo -e "${RED}✗ SAST findings require attention${NC}"
+            FAILED=1
+        elif [ $EXIT_CODE -eq 2 ]; then
+            echo -e "${YELLOW}⚠ SAST analysis encountered an error${NC}"
+        fi
+    fi
+else
+    echo -e "\n${YELLOW}▶ Skipping SAST (no Go files staged)${NC}"
+fi
+
+echo ""
+if [ $FAILED -eq 1 ]; then
+    echo -e "${RED}━━━ Pre-commit check FAILED ━━━${NC}"
+    echo -e "Run ${CYAN}verdict scan${NC} to see detailed findings."
+    echo -e "Use ${CYAN}git commit --no-verify${NC} to bypass (not recommended)."
+    exit 1
+else
+    echo -e "${GREEN}━━━ Pre-commit check PASSED ━━━${NC}"
+    exit 0
+fi
