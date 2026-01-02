@@ -1,0 +1,490 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Nav from '../components/Nav.astro';
+import Footer from '../components/Footer.astro';
+import Terminal from '../components/Terminal.vue';
+import EngineCard from '../components/EngineCard.vue';
+import CodeBlock from '../components/CodeBlock.astro';
+
+const engines = [
+  {
+    icon: 'G',
+    name: 'Gosec',
+    type: 'Static Analysis',
+    description: 'Inspects Go source code for security vulnerabilities by scanning the AST. Detects SQL injection, command injection, hardcoded credentials, and more.'
+  },
+  {
+    icon: 'V',
+    name: 'Govulncheck',
+    type: 'Vulnerability',
+    description: 'Official Go vulnerability scanner. Analyzes your code and dependencies against the Go vulnerability database with call-graph analysis.'
+  },
+  {
+    icon: 'L',
+    name: 'Gitleaks',
+    type: 'Secrets Detection',
+    description: 'Detects hardcoded secrets, API keys, and passwords in your codebase. Prevents credential leaks before they reach version control.'
+  },
+  {
+    icon: 'S',
+    name: 'Staticcheck',
+    type: 'Static Analysis',
+    description: 'Advanced static analysis for Go. Detects dead code, unused variables, deprecated functions, and subtle bugs that escape other tools.'
+  },
+  {
+    icon: 'Y',
+    name: 'Syft',
+    type: 'SBOM Generation',
+    description: 'Generates Software Bill of Materials in SPDX and CycloneDX formats. Complete visibility into your dependency tree.'
+  },
+  {
+    icon: 'C',
+    name: 'CycloneDX',
+    type: 'SBOM Generation',
+    description: 'Native CycloneDX SBOM generator for Go modules. Creates standards-compliant bills of materials for supply chain security.'
+  }
+];
+
+const features = [
+  { icon: '⚡', title: 'Deterministic Results', description: 'Same inputs, same outputs. Every time. Versions tracked in assessment metadata for complete reproducibility.' },
+  { icon: '🎯', title: 'Policy-Driven', description: 'Define thresholds, suppressions, and gating rules. Decisions derived from findings + policy — fully transparent.' },
+  { icon: '📋', title: 'Baseline Management', description: 'Track existing findings with fingerprint-based baselines. Focus on new issues without noise from known items.' },
+  { icon: '🔄', title: 'CI/CD Ready', description: 'Clear exit codes (0=PASS, 1=FAIL, 2=ERROR). Strict mode for pipelines. JSON and SARIF output formats.' },
+  { icon: '🤖', title: 'MCP Server', description: 'Integrate with AI assistants via Model Context Protocol. Expose security scanning as read-only tools and resources.' },
+  { icon: '🔒', title: 'Secrets Redaction', description: 'Detected secrets are always redacted. Never stored raw, never logged. Security by design.' }
+];
+---
+
+<Layout title="VerdictSec - Go Security Assessment CLI">
+  <Nav />
+
+  <main>
+    <!-- Hero Section -->
+    <section class="hero">
+      <div class="hero-badge">
+        <span class="hero-badge-dot"></span>
+        v0.5.3 — Now with MCP Server
+      </div>
+      <h1>Security scanning<br>for <span class="accent">Go</span> codebases</h1>
+      <p class="hero-subtitle">
+        Deterministic, policy-driven security assessment. SAST, vulnerability detection,
+        secrets scanning, and SBOM generation — unified under one CLI.
+      </p>
+      <div class="hero-actions">
+        <a href="#install" class="btn btn-primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          Install
+        </a>
+        <a href="https://github.com/felixgeelhaar/verdictsec" class="btn btn-secondary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+          </svg>
+          View on GitHub
+        </a>
+      </div>
+
+      <div class="terminal-preview">
+        <Terminal client:load />
+      </div>
+    </section>
+
+    <!-- Engines Section -->
+    <section id="engines">
+      <div class="section-header">
+        <div class="section-label">Security Engines</div>
+        <h2 class="section-title">Six engines. One unified scan.</h2>
+        <p class="section-subtitle">
+          Industry-standard security tools integrated under a deterministic, policy-driven model.
+        </p>
+      </div>
+
+      <div class="engines-grid">
+        {engines.map((engine) => (
+          <EngineCard
+            icon={engine.icon}
+            name={engine.name}
+            type={engine.type}
+            description={engine.description}
+            client:visible
+          />
+        ))}
+      </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features">
+      <div class="section-header">
+        <div class="section-label">Capabilities</div>
+        <h2 class="section-title">Built for modern security workflows</h2>
+        <p class="section-subtitle">
+          Policy-driven decisions, baseline management, and seamless CI/CD integration.
+        </p>
+      </div>
+
+      <div class="features-grid">
+        {features.map((feature) => (
+          <div class="feature">
+            <div class="feature-icon">{feature.icon}</div>
+            <h3 class="feature-title">{feature.title}</h3>
+            <p class="feature-description">{feature.description}</p>
+          </div>
+        ))}
+      </div>
+
+    </section>
+
+    <!-- MCP Section -->
+    <section id="mcp" class="mcp-full-section">
+      <div class="section-header">
+        <div class="section-label">AI Integration</div>
+        <h2 class="section-title">Model Context Protocol Server</h2>
+        <p class="section-subtitle">
+          Expose security scanning to AI assistants. Run scans, check policies, and manage
+          baselines directly from Claude Code or any MCP-compatible client.
+        </p>
+      </div>
+
+      <div class="mcp-grid">
+        <div class="mcp-card mcp-tools">
+          <h3>
+            <span class="mcp-icon">⚡</span>
+            MCP Tools
+          </h3>
+          <ul class="mcp-list">
+            <li><code>verdict_scan</code> — Run full security scan</li>
+            <li><code>verdict_sast</code> — Static analysis only</li>
+            <li><code>verdict_vuln</code> — Vulnerability scanning</li>
+            <li><code>verdict_secrets</code> — Secrets detection</li>
+            <li><code>verdict_policy_check</code> — Evaluate policy</li>
+            <li><code>verdict_baseline_add</code> — Add to baseline</li>
+          </ul>
+        </div>
+
+        <div class="mcp-card mcp-resources">
+          <h3>
+            <span class="mcp-icon">📚</span>
+            MCP Resources
+          </h3>
+          <ul class="mcp-list">
+            <li><code>verdict://config</code> — Current configuration</li>
+            <li><code>verdict://baseline</code> — Baseline fingerprints</li>
+            <li><code>verdict://engines</code> — Available engines</li>
+          </ul>
+        </div>
+
+        <div class="mcp-card mcp-install-card">
+          <h3>
+            <span class="mcp-icon">🚀</span>
+            Quick Setup
+          </h3>
+          <CodeBlock
+            code={`<span class="comment"># Add to Claude Code</span>\nclaude mcp add verdictsec -- verdict mcp serve\n\n<span class="comment"># Or run standalone</span>\nverdict mcp serve`}
+            copyText="claude mcp add verdictsec -- verdict mcp serve"
+          />
+        </div>
+      </div>
+    </section>
+
+    <!-- Install Section -->
+    <section id="install">
+      <div class="section-header">
+        <div class="section-label">Get Started</div>
+        <h2 class="section-title">Install in seconds</h2>
+        <p class="section-subtitle">
+          Available via Homebrew or Go install. Start scanning immediately.
+        </p>
+      </div>
+
+      <div class="install-section">
+        <div class="install-grid">
+          <div class="install-option">
+            <h3>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M5.566 3.773c.065.186.137.38.222.58 1.096 2.572 3.047 4.49 5.213 5.647-.062-.343-.094-.712-.094-1.098 0-3.038 2.275-5.502 5.082-5.502 1.406 0 2.684.617 3.594 1.617l2.824-.002c.097 0 .182.057.222.145.04.087.025.189-.037.262l-2.11 2.436c.017.209.025.42.025.634 0 4.766-3.562 10.258-10.076 10.258-2.002 0-3.865-.599-5.431-1.627-.122-.08-.139-.259-.037-.363.08-.082.204-.099.303-.04 1.125.664 2.406 1.03 3.765 1.03 5.326 0 8.676-4.453 8.676-8.858 0-.175-.007-.35-.017-.523l-.01-.102.077-.068 1.848-1.632-1.723.001-.055-.06c-.765-.84-1.83-1.304-2.998-1.304-2.222 0-4.049 1.948-4.049 4.343 0 .655.13 1.283.374 1.865l.147.35-.362.11c-2.397.73-4.552-1.134-6.266-3.724-.388-.587-.718-1.204-.984-1.83-.107-.25-.199-.495-.276-.729-.04-.121.018-.252.134-.307.071-.034.152-.031.22.006.51.28.996.6 1.457.957.196.152.387.31.574.476.047-.234.11-.462.193-.683.135-.358.315-.695.534-1.007.047-.066.12-.11.198-.117.08-.006.157.025.212.086.318.354.605.727.86 1.115z"/>
+              </svg>
+              Homebrew
+            </h3>
+            <CodeBlock
+              code="brew install felixgeelhaar/tap/verdictsec"
+              copyText="brew install felixgeelhaar/tap/verdictsec"
+            />
+          </div>
+
+          <div class="install-option">
+            <h3>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M1.811 10.231c-.047 0-.058-.023-.035-.059l.246-.315c.023-.035.081-.058.128-.058h4.172c.046 0 .058.035.035.07l-.199.303c-.023.036-.082.07-.117.07l-4.23-.011zM.047 11.306c-.047 0-.059-.023-.035-.058l.245-.316c.023-.035.082-.058.129-.058h5.328c.047 0 .07.035.058.07l-.093.28c-.012.047-.058.07-.105.07l-5.527.012zm2.828 1.075c-.047 0-.059-.035-.035-.07l.163-.292c.023-.035.07-.07.117-.07h2.337c.047 0 .07.035.07.082l-.023.28c0 .047-.047.082-.082.082l-2.547-.012z"/>
+              </svg>
+              Go Install
+            </h3>
+            <CodeBlock
+              code="go install github.com/felixgeelhaar/verdictsec/cmd/verdict@latest"
+              copyText="go install github.com/felixgeelhaar/verdictsec/cmd/verdict@latest"
+            />
+          </div>
+        </div>
+
+        <div class="quick-start">
+          <h3>Quick Start</h3>
+          <CodeBlock
+            code={`<span class="comment"># Run a full security scan</span>
+verdict scan
+
+<span class="comment"># CI mode with strict exit codes</span>
+verdict ci
+
+<span class="comment"># Individual engine scans</span>
+verdict sast      <span class="comment"># Static analysis only</span>
+verdict vuln      <span class="comment"># Vulnerability scan only</span>
+verdict secrets   <span class="comment"># Secrets detection only</span>
+verdict sbom      <span class="comment"># Generate SBOM</span>`}
+            copyText="verdict scan"
+          />
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <Footer />
+</Layout>
+
+<style>
+  /* Hero */
+  .hero {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 8rem 2rem 4rem;
+    max-width: 1200px;
+    margin: 0 auto;
+    position: relative;
+  }
+
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    padding: 0.375rem 0.875rem;
+    border-radius: 100px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 1.5rem;
+    width: fit-content;
+    animation: fadeInUp 0.6s ease-out;
+  }
+
+  .hero-badge-dot {
+    width: 6px;
+    height: 6px;
+    background: var(--accent);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+
+  .hero h1 {
+    font-size: clamp(3rem, 8vw, 5.5rem);
+    font-weight: 700;
+    line-height: 1.05;
+    letter-spacing: -0.03em;
+    margin-bottom: 1.5rem;
+    animation: fadeInUp 0.6s ease-out 0.1s both;
+  }
+
+  .accent {
+    color: var(--accent);
+  }
+
+  .hero-subtitle {
+    font-size: 1.25rem;
+    color: var(--text-secondary);
+    max-width: 600px;
+    margin-bottom: 2.5rem;
+    animation: fadeInUp 0.6s ease-out 0.2s both;
+  }
+
+  .hero-actions {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    animation: fadeInUp 0.6s ease-out 0.3s both;
+  }
+
+  .terminal-preview {
+    margin-top: 4rem;
+    animation: fadeInUp 0.6s ease-out 0.4s both;
+  }
+
+  /* Engines Grid */
+  .engines-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 1.5rem;
+  }
+
+  /* Features Grid */
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 2rem;
+  }
+
+  .feature {
+    padding: 1.5rem 0;
+  }
+
+  .feature-icon {
+    width: 40px;
+    height: 40px;
+    background: var(--accent-glow);
+    border: 1px solid rgba(34, 197, 94, 0.2);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1rem;
+    font-size: 1.25rem;
+  }
+
+  .feature-title {
+    font-weight: 600;
+    font-size: 1.125rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .feature-description {
+    color: var(--text-secondary);
+    font-size: 0.9375rem;
+  }
+
+  /* MCP Section */
+  .mcp-full-section {
+    background: linear-gradient(180deg, rgba(34, 197, 94, 0.03) 0%, transparent 100%);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    padding: 6rem 2rem;
+    margin: 0 -2rem;
+  }
+
+  .mcp-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .mcp-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+  }
+
+  .mcp-card h3 {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 1.125rem;
+    margin-bottom: 1rem;
+  }
+
+  .mcp-icon {
+    font-size: 1.25rem;
+  }
+
+  .mcp-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .mcp-list li {
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+  }
+
+  .mcp-list li:last-child {
+    border-bottom: none;
+  }
+
+  .mcp-list code {
+    background: var(--bg-tertiary);
+    padding: 0.125rem 0.375rem;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    color: var(--accent);
+  }
+
+  .mcp-install-card {
+    grid-column: span 1;
+  }
+
+  @media (min-width: 900px) {
+    .mcp-install-card {
+      grid-column: span 1;
+    }
+  }
+
+  /* Install Section */
+  .install-section {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 3rem;
+  }
+
+  .install-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+  }
+
+  .install-option h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .quick-start {
+    margin-top: 2rem;
+  }
+
+  .quick-start h3 {
+    font-size: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  @media (max-width: 768px) {
+    .hero {
+      padding: 6rem 1.5rem 3rem;
+    }
+
+    .engines-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .install-section,
+    .mcp-section {
+      padding: 2rem 1.5rem;
+    }
+
+    .mcp-header {
+      flex-direction: column;
+      gap: 1rem;
+    }
+  }
+</style>

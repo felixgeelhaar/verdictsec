@@ -1,0 +1,65 @@
+---
+
+---
+
+<footer>
+  <div class="footer-content">
+    <div class="footer-logo">VerdictSec</div>
+    <div class="footer-links">
+      <a href="https://github.com/felixgeelhaar/verdictsec">GitHub</a>
+      <a href="https://github.com/felixgeelhaar/verdictsec/issues">Issues</a>
+      <a href="https://github.com/felixgeelhaar/verdictsec/blob/main/CONTRIBUTING.md">Contributing</a>
+    </div>
+    <div class="footer-copy">Apache-2.0 License</div>
+  </div>
+</footer>
+
+<style>
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 3rem 2rem;
+    margin-top: 4rem;
+  }
+
+  .footer-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+  }
+
+  .footer-logo {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .footer-links {
+    display: flex;
+    gap: 2rem;
+  }
+
+  .footer-links a {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+  }
+
+  .footer-links a:hover {
+    color: var(--text-primary);
+  }
+
+  .footer-copy {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+  }
+
+  @media (max-width: 768px) {
+    .footer-content {
+      flex-direction: column;
+      text-align: center;
+    }
+  }
+</style>
