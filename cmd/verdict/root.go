@@ -26,6 +26,7 @@ var (
 	verbosity   string
 	noColor     bool
 	jsonOutput  bool
+	sarifOutput bool
 	strictMode  bool
 	targetPath  string
 )
@@ -74,6 +75,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&verbosity, "verbosity", "v", "normal", "verbosity level (quiet, normal, verbose, debug)")
 	rootCmd.PersistentFlags().BoolVar(&noColor, "no-color", false, "disable colored output")
 	rootCmd.PersistentFlags().BoolVar(&jsonOutput, "json", false, "output in JSON format")
+	rootCmd.PersistentFlags().BoolVar(&sarifOutput, "sarif", false, "output in SARIF format")
 	rootCmd.PersistentFlags().BoolVar(&strictMode, "strict", false, "strict mode (fail on warnings)")
 
 	// Add version command
@@ -114,8 +116,10 @@ func loadConfig() (*config.Config, error) {
 
 // applyOverrides applies CLI flag overrides to the config
 func applyOverrides(cfg *config.Config) {
-	// Output format
-	if jsonOutput {
+	// Output format (sarif takes precedence over json)
+	if sarifOutput {
+		cfg.Output.Format = "sarif"
+	} else if jsonOutput {
 		cfg.Output.Format = "json"
 	}
 
