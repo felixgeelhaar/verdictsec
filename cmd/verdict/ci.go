@@ -12,9 +12,19 @@ import (
 	domainBaseline "github.com/felixgeelhaar/verdictsec/internal/domain/baseline"
 	"github.com/felixgeelhaar/verdictsec/internal/domain/policy"
 	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/baseline"
+	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/config"
 	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/engines"
+	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/github"
+	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/writers"
 	"github.com/felixgeelhaar/verdictsec/pkg/exitcode"
 	"github.com/spf13/cobra"
+)
+
+var (
+	prNumber   int
+	prRepo     string
+	prToken    string
+	prAnnotate bool
 )
 
 // ciCmd performs a CI-mode security scan with strict settings
@@ -28,15 +38,29 @@ CI mode:
   - Uses JSON output format by default when in non-interactive mode
   - Exits with non-zero code on any policy violation
 
+PR Annotations:
+  - Use --pr <number> to post findings as inline review comments
+  - Findings are filtered to only files changed in the PR
+  - Critical/High findings trigger REQUEST_CHANGES review
+  - Requires GITHUB_TOKEN environment variable
+
 Examples:
   verdict ci                       # Scan current directory
   verdict ci ./myproject           # Scan specific path
-  verdict ci --json                # Force JSON output`,
+  verdict ci --json                # Force JSON output
+  verdict ci --pr 123              # Post findings to PR #123
+  verdict ci --pr 123 --repo owner/repo   # Explicit repository`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: runCI,
 }
 
 func init() {
+	// PR annotation flags
+	ciCmd.Flags().IntVar(&prNumber, "pr", 0, "PR number to annotate with findings")
+	ciCmd.Flags().StringVar(&prRepo, "repo", "", "repository in owner/repo format (default: GITHUB_REPOSITORY)")
+	ciCmd.Flags().StringVar(&prToken, "token", "", "GitHub token (default: GITHUB_TOKEN)")
+	ciCmd.Flags().BoolVar(&prAnnotate, "annotate", true, "post inline comments (use --annotate=false for summary only)")
+
 	rootCmd.AddCommand(ciCmd)
 }
 
@@ -62,8 +86,8 @@ func runCI(cmd *cobra.Command, args []string) error {
 	// CI mode is always strict
 	cfg.Policy.BaselineMode = "strict"
 
-	// Create writer
-	writer, err := createWriter(cfg)
+	// Create writer (may be GitHub PR writer if --pr is specified)
+	writer, err := createCIWriter(ctx, cfg)
 	if err != nil {
 		return fmt.Errorf("failed to create writer: %w", err)
 	}
@@ -161,4 +185,39 @@ func runCI(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+// createCIWriter creates a writer for CI mode, which may be a GitHub PR writer.
+func createCIWriter(ctx context.Context, cfg *config.Config) (ports.ArtifactWriter, error) {
+	// If --pr is specified, use GitHub PR writer
+	if prNumber > 0 {
+		// Auto-detect PR number from GitHub Actions if not specified
+		prNum := prNumber
+		if prNum == 0 {
+			var err error
+			prNum, err = github.GetPRNumber()
+			if err != nil {
+				return nil, fmt.Errorf("PR number not specified and could not be detected: %w", err)
+			}
+		}
+
+		repo := prRepo
+		if repo == "" {
+			repo = github.GetRepository()
+		}
+
+		prWriter, err := writers.NewGitHubPRWriter(ctx, writers.GitHubPRWriterConfig{
+			Token:      prToken,
+			Repository: repo,
+			PRNumber:   prNum,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create GitHub PR writer: %w", err)
+		}
+
+		return prWriter, nil
+	}
+
+	// Default to standard writer
+	return createWriter(cfg)
 }
