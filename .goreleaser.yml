@@ -1,0 +1,131 @@
+# GoReleaser configuration for VerdictSec
+# Documentation: https://goreleaser.com
+
+version: 2
+
+project_name: verdict
+
+before:
+  hooks:
+    - go mod tidy
+    - go generate ./...
+
+builds:
+  - id: verdict
+    main: ./cmd/verdict
+    binary: verdict
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.buildDate={{.Date}}
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+archives:
+  - id: tar
+    formats:
+      - tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README.md
+      - LICENSE*
+      - CHANGELOG.md
+
+  - id: zip
+    formats:
+      - zip
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README.md
+      - LICENSE*
+      - CHANGELOG.md
+
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+      - "^chore:"
+      - Merge pull request
+      - Merge branch
+  groups:
+    - title: "New Features"
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: "Bug Fixes"
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: "Security"
+      regexp: '^.*?sec(\([[:word:]]+\))??!?:.+$'
+      order: 2
+    - title: "Other"
+      order: 999
+
+brews:
+  - name: verdict
+    repository:
+      owner: felixgeelhaar
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Formula
+    homepage: "https://github.com/felixgeelhaar/verdictsec"
+    description: "Go security assessment CLI - SAST, vulnerabilities, secrets, SBOM"
+    license: "Apache-2.0"
+    install: |
+      bin.install "verdict"
+    test: |
+      system "#{bin}/verdict", "--version"
+    dependencies:
+      - name: go
+        type: optional
+
+release:
+  github:
+    owner: felixgeelhaar
+    name: verdictsec
+  draft: false
+  prerelease: auto
+  mode: replace
+  header: |
+    ## VerdictSec {{ .Tag }}
+
+    Security assessment CLI for Go codebases.
+  footer: |
+    ---
+
+    **Full Changelog**: https://github.com/felixgeelhaar/verdictsec/compare/{{ .PreviousTag }}...{{ .Tag }}
+
+    ### Installation
+
+    ```bash
+    # Homebrew (macOS/Linux)
+    brew install felixgeelhaar/tap/verdict
+
+    # Go install
+    go install github.com/felixgeelhaar/verdictsec/cmd/verdict@{{ .Tag }}
+
+    # Download binary
+    # See assets below for your platform
+    ```
+
+announce:
+  skip: true

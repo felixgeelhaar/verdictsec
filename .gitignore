@@ -29,3 +29,6 @@ Thumbs.db
 
 # Relicta release state
 .relicta/
+
+# GoReleaser
+dist/
