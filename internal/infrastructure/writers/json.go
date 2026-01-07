@@ -128,6 +128,99 @@ func (w *JSONWriter) WriteError(err error) error {
 	return w.writeJSON(errOutput)
 }
 
+// DiffInput contains input for writing diff results.
+type DiffInput struct {
+	FromRef       string
+	ToRef         string
+	NewFindings   []*finding.Finding
+	FixedFindings []*finding.Finding
+	Unchanged     []*finding.Finding
+}
+
+// WriteDiff writes diff results as JSON.
+func (w *JSONWriter) WriteDiff(input DiffInput) error {
+	// Convert findings to JSON format
+	newFindings := make([]JSONFinding, len(input.NewFindings))
+	for i, f := range input.NewFindings {
+		newFindings[i] = w.buildFindingForDiff(f)
+	}
+
+	fixedFindings := make([]JSONFinding, len(input.FixedFindings))
+	for i, f := range input.FixedFindings {
+		fixedFindings[i] = w.buildFindingForDiff(f)
+	}
+
+	unchanged := make([]JSONFinding, len(input.Unchanged))
+	for i, f := range input.Unchanged {
+		unchanged[i] = w.buildFindingForDiff(f)
+	}
+
+	// Build severity counts
+	newBySeverity := make(map[string]int)
+	for _, f := range input.NewFindings {
+		sev := f.EffectiveSeverity().String()
+		newBySeverity[sev]++
+	}
+
+	fixedBySeverity := make(map[string]int)
+	for _, f := range input.FixedFindings {
+		sev := f.EffectiveSeverity().String()
+		fixedBySeverity[sev]++
+	}
+
+	output := JSONDiffOutput{
+		Version:       "1",
+		FromRef:       input.FromRef,
+		ToRef:         input.ToRef,
+		NewFindings:   newFindings,
+		FixedFindings: fixedFindings,
+		Unchanged:     unchanged,
+		Summary: JSONDiffSummary{
+			TotalNew:        len(input.NewFindings),
+			TotalFixed:      len(input.FixedFindings),
+			TotalUnchanged:  len(input.Unchanged),
+			NetChange:       len(input.NewFindings) - len(input.FixedFindings),
+			NewBySeverity:   newBySeverity,
+			FixedBySeverity: fixedBySeverity,
+		},
+	}
+
+	return w.writeJSON(output)
+}
+
+// buildFindingForDiff converts a finding to JSON format for diff output.
+func (w *JSONWriter) buildFindingForDiff(f *finding.Finding) JSONFinding {
+	jf := JSONFinding{
+		ID:          f.ID(),
+		Type:        f.Type().String(),
+		EngineID:    f.EngineID(),
+		RuleID:      f.RuleID(),
+		Title:       f.Title(),
+		Description: f.Description(),
+		Severity:    f.EffectiveSeverity().String(),
+		Confidence:  f.Confidence().String(),
+		Location: JSONLocation{
+			File:      f.Location().File(),
+			Line:      f.Location().Line(),
+			Column:    f.Location().Column(),
+			EndLine:   f.Location().EndLine(),
+			EndColumn: f.Location().EndColumn(),
+		},
+		Fingerprint: f.Fingerprint().Value(),
+		CWEID:       f.CWEID(),
+		CVEID:       f.CVEID(),
+		FixVersion:  f.FixVersion(),
+	}
+
+	// Redact sensitive metadata
+	metadata := f.Metadata()
+	if len(metadata) > 0 {
+		jf.Metadata = w.redactor.RedactMap(metadata)
+	}
+
+	return jf
+}
+
 // Flush ensures all output is written.
 func (w *JSONWriter) Flush() error {
 	return nil
@@ -379,6 +472,27 @@ type JSONError struct {
 	Type      string    `json:"type"`
 	Message   string    `json:"message"`
 	Timestamp time.Time `json:"timestamp"`
+}
+
+// JSONDiffOutput is the diff-specific JSON output structure.
+type JSONDiffOutput struct {
+	Version        string            `json:"version"`
+	FromRef        string            `json:"from_ref"`
+	ToRef          string            `json:"to_ref"`
+	NewFindings    []JSONFinding     `json:"new_findings"`
+	FixedFindings  []JSONFinding     `json:"fixed_findings"`
+	Unchanged      []JSONFinding     `json:"unchanged,omitempty"`
+	Summary        JSONDiffSummary   `json:"summary"`
+}
+
+// JSONDiffSummary is the summary section of diff output.
+type JSONDiffSummary struct {
+	TotalNew        int            `json:"total_new"`
+	TotalFixed      int            `json:"total_fixed"`
+	TotalUnchanged  int            `json:"total_unchanged"`
+	NetChange       int            `json:"net_change"`
+	NewBySeverity   map[string]int `json:"new_by_severity"`
+	FixedBySeverity map[string]int `json:"fixed_by_severity"`
 }
 
 // Ensure JSONWriter implements the interface.
