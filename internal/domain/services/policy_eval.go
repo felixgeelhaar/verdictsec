@@ -11,12 +11,13 @@ import (
 
 // EvaluationResult contains the results of policy evaluation.
 type EvaluationResult struct {
-	Decision    assessment.Decision
-	Reasons     []string
-	NewFindings []*finding.Finding
-	Existing    []*finding.Finding
-	Suppressed  []*finding.Finding
-	Score       Score // Security score (0-100 with A-F grade)
+	Decision        assessment.Decision
+	Reasons         []string
+	NewFindings     []*finding.Finding
+	Existing        []*finding.Finding
+	Suppressed      []*finding.Finding
+	InlineSuppressed []*finding.Finding // Findings suppressed by inline comments
+	Score           Score              // Security score (0-100 with A-F grade)
 }
 
 // PolicyEvaluationService evaluates findings against policy.
@@ -122,11 +123,12 @@ func (s *PolicyEvaluationService) EvaluateWithStats(
 	result := s.Evaluate(findings, pol, base, mode)
 
 	stats := EvaluationStats{
-		TotalFindings:      len(findings),
-		NewFindings:        len(result.NewFindings),
-		ExistingFindings:   len(result.Existing),
-		SuppressedFindings: len(result.Suppressed),
-		SeverityCounts:     make(map[finding.Severity]int),
+		TotalFindings:        len(findings),
+		NewFindings:          len(result.NewFindings),
+		ExistingFindings:     len(result.Existing),
+		SuppressedFindings:   len(result.Suppressed),
+		InlineSuppressedFindings: len(result.InlineSuppressed),
+		SeverityCounts:       make(map[finding.Severity]int),
 	}
 
 	// Count by severity (excluding suppressed)
@@ -142,11 +144,12 @@ func (s *PolicyEvaluationService) EvaluateWithStats(
 
 // EvaluationStats provides statistics about the evaluation.
 type EvaluationStats struct {
-	TotalFindings      int
-	NewFindings        int
-	ExistingFindings   int
-	SuppressedFindings int
-	SeverityCounts     map[finding.Severity]int
+	TotalFindings            int
+	NewFindings              int
+	ExistingFindings         int
+	SuppressedFindings       int
+	InlineSuppressedFindings int
+	SeverityCounts           map[finding.Severity]int
 }
 
 // CriticalCount returns the number of critical findings.
@@ -167,4 +170,9 @@ func (s EvaluationStats) MediumCount() int {
 // LowCount returns the number of low severity findings.
 func (s EvaluationStats) LowCount() int {
 	return s.SeverityCounts[finding.SeverityLow]
+}
+
+// InlineSuppressedCount returns the number of inline suppressed findings.
+func (s EvaluationStats) InlineSuppressedCount() int {
+	return s.InlineSuppressedFindings
 }

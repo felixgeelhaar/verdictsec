@@ -283,10 +283,14 @@ func (w *ConsoleWriter) writeSummary(a *assessment.Assessment, result services.E
 		fmt.Fprintf(w.out, "  %s: %d\n", w.blue("Low"), summary[finding.SeverityLow])
 	}
 
-	if len(result.NewFindings) > 0 || len(result.Existing) > 0 || len(result.Suppressed) > 0 {
+	if len(result.NewFindings) > 0 || len(result.Existing) > 0 || len(result.Suppressed) > 0 || len(result.InlineSuppressed) > 0 {
 		fmt.Fprintln(w.out)
-		fmt.Fprintf(w.out, "New: %d, Baseline: %d, Suppressed: %d\n",
+		fmt.Fprintf(w.out, "New: %d, Baseline: %d, Suppressed: %d",
 			len(result.NewFindings), len(result.Existing), len(result.Suppressed))
+		if len(result.InlineSuppressed) > 0 {
+			fmt.Fprintf(w.out, ", Inline: %d", len(result.InlineSuppressed))
+		}
+		fmt.Fprintln(w.out)
 	}
 
 	fmt.Fprintln(w.out)

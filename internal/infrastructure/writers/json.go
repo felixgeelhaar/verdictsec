@@ -98,11 +98,12 @@ func (w *JSONWriter) WriteSummary(a *assessment.Assessment, result services.Eval
 			Description: result.Score.Grade.Description(),
 			Factors:     scoreFactors,
 		},
-		TotalCount:      a.FindingCount(),
-		NewCount:        len(result.NewFindings),
-		ExistingCount:   len(result.Existing),
-		SuppressedCount: len(result.Suppressed),
-		Duration:        a.Duration().String(),
+		TotalCount:            a.FindingCount(),
+		NewCount:              len(result.NewFindings),
+		ExistingCount:         len(result.Existing),
+		SuppressedCount:       len(result.Suppressed),
+		InlineSuppressedCount: len(result.InlineSuppressed),
+		Duration:              a.Duration().String(),
 	}
 	return w.writeJSON(summary)
 }
@@ -184,11 +185,12 @@ func (w *JSONWriter) buildOutput(a *assessment.Assessment, result services.Evalu
 		EngineRuns:  engineRuns,
 		Findings:    findings,
 		Summary: JSONSummarySection{
-			Total:          a.FindingCount(),
-			BySeverity:     severityCounts,
-			NewCount:       len(result.NewFindings),
-			ExistingCount:  len(result.Existing),
-			SuppressedCount: len(result.Suppressed),
+			Total:               a.FindingCount(),
+			BySeverity:          severityCounts,
+			NewCount:            len(result.NewFindings),
+			ExistingCount:       len(result.Existing),
+			SuppressedCount:     len(result.Suppressed),
+			InlineSuppressedCount: len(result.InlineSuppressed),
 		},
 		Score: JSONScore{
 			Value:       result.Score.Value,
@@ -338,11 +340,12 @@ type JSONLocation struct {
 
 // JSONSummarySection is the summary section of the output.
 type JSONSummarySection struct {
-	Total           int            `json:"total"`
-	BySeverity      map[string]int `json:"by_severity"`
-	NewCount        int            `json:"new"`
-	ExistingCount   int            `json:"existing"`
-	SuppressedCount int            `json:"suppressed"`
+	Total               int            `json:"total"`
+	BySeverity          map[string]int `json:"by_severity"`
+	NewCount            int            `json:"new"`
+	ExistingCount       int            `json:"existing"`
+	SuppressedCount     int            `json:"suppressed"`
+	InlineSuppressedCount int          `json:"inline_suppressed"`
 }
 
 // JSONDecision is the decision section of the output.
@@ -353,14 +356,15 @@ type JSONDecision struct {
 
 // JSONSummary is a brief summary output.
 type JSONSummary struct {
-	Target          string    `json:"target"`
-	Decision        string    `json:"decision"`
-	Score           JSONScore `json:"score"`
-	TotalCount      int       `json:"total_findings"`
-	NewCount        int       `json:"new_findings"`
-	ExistingCount   int       `json:"existing_findings"`
-	SuppressedCount int       `json:"suppressed_findings"`
-	Duration        string    `json:"duration"`
+	Target               string    `json:"target"`
+	Decision             string    `json:"decision"`
+	Score                JSONScore `json:"score"`
+	TotalCount           int       `json:"total_findings"`
+	NewCount             int       `json:"new_findings"`
+	ExistingCount        int       `json:"existing_findings"`
+	SuppressedCount      int       `json:"suppressed_findings"`
+	InlineSuppressedCount int       `json:"inline_suppressed_findings"`
+	Duration             string    `json:"duration"`
 }
 
 // JSONProgress represents a progress message.

@@ -6,16 +6,20 @@ import (
 	"github.com/felixgeelhaar/verdictsec/internal/application/ports"
 	"github.com/felixgeelhaar/verdictsec/internal/domain/assessment"
 	"github.com/felixgeelhaar/verdictsec/internal/domain/baseline"
+	"github.com/felixgeelhaar/verdictsec/internal/domain/finding"
 	"github.com/felixgeelhaar/verdictsec/internal/domain/policy"
 	"github.com/felixgeelhaar/verdictsec/internal/domain/services"
+	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/suppression"
 )
 
 // EvaluatePolicyInput contains the input for policy evaluation.
 type EvaluatePolicyInput struct {
-	Assessment *assessment.Assessment
-	Policy     *policy.Policy
-	Baseline   *baseline.Baseline
-	Mode       policy.Mode
+	Assessment               *assessment.Assessment
+	Policy                   *policy.Policy
+	Baseline                 *baseline.Baseline
+	Mode                     policy.Mode
+	InlineSuppressionsEnabled bool
+	TargetDir                string // Target directory for inline suppression parsing
 }
 
 // EvaluatePolicyOutput contains the result of policy evaluation.
@@ -27,19 +31,21 @@ type EvaluatePolicyOutput struct {
 
 // EvaluatePolicyUseCase evaluates scan results against policy.
 type EvaluatePolicyUseCase struct {
-	policyService *services.PolicyEvaluationService
-	diffService   *services.DiffService
-	scoreService  *services.ScoreService
-	writer        ports.ArtifactWriter
+	policyService      *services.PolicyEvaluationService
+	diffService        *services.DiffService
+	scoreService       *services.ScoreService
+	suppressionService *suppression.InlineSuppressionService
+	writer             ports.ArtifactWriter
 }
 
 // NewEvaluatePolicyUseCase creates a new policy evaluation use case.
 func NewEvaluatePolicyUseCase(writer ports.ArtifactWriter) *EvaluatePolicyUseCase {
 	return &EvaluatePolicyUseCase{
-		policyService: services.NewPolicyEvaluationService(),
-		diffService:   services.NewDiffService(),
-		scoreService:  services.NewScoreService(),
-		writer:        writer,
+		policyService:      services.NewPolicyEvaluationService(),
+		diffService:        services.NewDiffService(),
+		scoreService:       services.NewScoreService(),
+		suppressionService: suppression.NewInlineSuppressionService(),
+		writer:             writer,
 	}
 }
 
@@ -48,13 +54,27 @@ func (uc *EvaluatePolicyUseCase) Execute(_ context.Context, input EvaluatePolicy
 	// Get findings from assessment
 	findings := input.Assessment.Findings()
 
-	// Evaluate against policy
+	// Apply inline suppressions if enabled
+	var inlineSuppressed []*finding.Finding
+	if input.InlineSuppressionsEnabled && input.TargetDir != "" {
+		matcher, err := uc.suppressionService.ParseAndMatch(input.TargetDir, findings)
+		if err == nil && matcher != nil {
+			inlineSuppressed, findings = matcher.PartitionFindings(findings)
+		}
+		// If parsing fails, we just continue with all findings
+	}
+
+	// Evaluate against policy (with inline suppressed findings removed)
 	result, stats := uc.policyService.EvaluateWithStats(
 		findings,
 		input.Policy,
 		input.Baseline,
 		input.Mode,
 	)
+
+	// Add inline suppressed findings to result
+	result.InlineSuppressed = inlineSuppressed
+	stats.InlineSuppressedFindings = len(inlineSuppressed)
 
 	// Calculate diff for score bonuses
 	var diffResult *services.DiffResult
@@ -63,7 +83,7 @@ func (uc *EvaluatePolicyUseCase) Execute(_ context.Context, input EvaluatePolicy
 		diffResult = &diff
 	}
 
-	// Calculate security score
+	// Calculate security score (based on non-inline-suppressed findings)
 	result.Score = uc.scoreService.Calculate(findings, input.Baseline, diffResult)
 
 	// Set decision on assessment

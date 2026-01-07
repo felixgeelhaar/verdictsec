@@ -6,10 +6,11 @@ import (
 
 // Config represents the complete application configuration.
 type Config struct {
-	Version string
-	Policy  policy.Policy
-	Engines map[EngineID]EngineConfig
-	Output  OutputConfig
+	Version                  string
+	Policy                   policy.Policy
+	Engines                  map[EngineID]EngineConfig
+	Output                   OutputConfig
+	InlineSuppressionsEnabled bool
 }
 
 // OutputConfig configures output format and behavior.

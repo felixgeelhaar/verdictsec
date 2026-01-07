@@ -49,9 +49,16 @@ type AIFeatures struct {
 
 // PolicyConfig defines policy settings for scan results.
 type PolicyConfig struct {
-	Threshold    ThresholdConfig     `yaml:"threshold" json:"threshold"`
-	BaselineMode string              `yaml:"baseline_mode" json:"baseline_mode"` // strict, warn, off
-	Suppressions []SuppressionConfig `yaml:"suppressions" json:"suppressions"`
+	Threshold           ThresholdConfig           `yaml:"threshold" json:"threshold"`
+	BaselineMode        string                    `yaml:"baseline_mode" json:"baseline_mode"` // strict, warn, off
+	Suppressions        []SuppressionConfig       `yaml:"suppressions" json:"suppressions"`
+	InlineSuppressions  InlineSuppressionsConfig  `yaml:"inline_suppressions" json:"inline_suppressions"`
+}
+
+// InlineSuppressionsConfig configures inline comment-based suppressions.
+type InlineSuppressionsConfig struct {
+	// Enabled controls whether inline suppressions are parsed and applied.
+	Enabled bool `yaml:"enabled" json:"enabled"`
 }
 
 // ThresholdConfig defines severity thresholds for pass/fail.
@@ -125,6 +132,9 @@ func DefaultConfig() *Config {
 			},
 			BaselineMode: "warn",
 			Suppressions: []SuppressionConfig{},
+			InlineSuppressions: InlineSuppressionsConfig{
+				Enabled: true, // Enabled by default
+			},
 		},
 		Engines: EnginesConfig{
 			Gosec: EngineSettings{
@@ -225,7 +235,13 @@ func (c *Config) ToPortsConfig() ports.Config {
 			Verbosity: c.GetVerbosity(),
 			Color:     c.Output.Color,
 		},
+		InlineSuppressionsEnabled: c.Policy.InlineSuppressions.Enabled,
 	}
+}
+
+// IsInlineSuppressionsEnabled returns true if inline suppressions are enabled.
+func (c *Config) IsInlineSuppressionsEnabled() bool {
+	return c.Policy.InlineSuppressions.Enabled
 }
 
 // toEngineConfig converts EngineSettings to ports.EngineConfig.
