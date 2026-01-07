@@ -32,6 +32,12 @@ const engines = [
     description: 'Advanced static analysis for Go. Detects dead code, unused variables, deprecated functions, and subtle bugs that escape other tools.'
   },
   {
+    icon: 'T',
+    name: 'Trivy',
+    type: 'Container Scanning',
+    description: 'Comprehensive container and filesystem vulnerability scanner. Detects CVEs in OS packages, language dependencies, and container images.'
+  },
+  {
     icon: 'Y',
     name: 'Syft',
     type: 'SBOM Generation',
@@ -51,7 +57,9 @@ const features = [
   { icon: '📋', title: 'Baseline Management', description: 'Track existing findings with fingerprint-based baselines. Focus on new issues without noise from known items.' },
   { icon: '🔄', title: 'CI/CD Ready', description: 'Clear exit codes (0=PASS, 1=FAIL, 2=ERROR). Strict mode for pipelines. JSON and SARIF output formats.' },
   { icon: '🧠', title: 'AI Advisory', description: 'Opt-in AI explanations and remediation suggestions. Understand findings faster with Claude-powered insights. Advisory-only — never modifies decisions.' },
-  { icon: '🔒', title: 'Secrets Redaction', description: 'Detected secrets are always redacted. Never stored raw, never logged. Security by design.' }
+  { icon: '🔒', title: 'Secrets Redaction', description: 'Detected secrets are always redacted. Never stored raw, never logged. Security by design.' },
+  { icon: '📦', title: 'Monorepo Support', description: 'Auto-discover Go modules and scan in parallel. Aggregate results across services with configurable workers and filters.' },
+  { icon: '🔧', title: 'Fix Auto-Apply', description: 'AI-generated code fixes with dry-run preview, backup, and rollback. Review suggestions before applying with full safety controls.' }
 ];
 ---
 
@@ -96,7 +104,7 @@ const features = [
     <section id="engines">
       <div class="section-header">
         <div class="section-label">Security Engines</div>
-        <h2 class="section-title">Six engines. One unified scan.</h2>
+        <h2 class="section-title">Seven engines. One unified scan.</h2>
         <p class="section-subtitle">
           Industry-standard security tools integrated under a deterministic, policy-driven model.
         </p>
@@ -245,9 +253,18 @@ verdict vuln      <span class="comment"># Vulnerability scan only</span>
 verdict secrets   <span class="comment"># Secrets detection only</span>
 verdict sbom      <span class="comment"># Generate SBOM</span>
 
+<span class="comment"># Monorepo scanning</span>
+verdict monorepo                  <span class="comment"># Scan all modules in parallel</span>
+verdict monorepo --workers=8      <span class="comment"># Use 8 parallel workers</span>
+verdict monorepo --by-module      <span class="comment"># Group output by module</span>
+
+<span class="comment"># AI-powered fix suggestions</span>
+verdict fix                       <span class="comment"># List fixable findings</span>
+verdict fix &lt;id&gt; --dry-run        <span class="comment"># Preview fix without applying</span>
+
 <span class="comment"># AI-powered advisory (requires ANTHROPIC_API_KEY)</span>
-verdict explain &lt;finding-id&gt;   <span class="comment"># Explain a finding</span>
-verdict ai summarize           <span class="comment"># Posture summary</span>`}
+verdict explain &lt;finding-id&gt;      <span class="comment"># Explain a finding</span>
+verdict ai summarize              <span class="comment"># Posture summary</span>`}
             copyText="verdict scan"
           />
         </div>

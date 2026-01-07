@@ -17,6 +17,7 @@ const (
 	EngineCycloneDX   EngineID = "cyclonedx-gomod"
 	EngineSyft        EngineID = "syft"
 	EngineStaticcheck EngineID = "staticcheck"
+	EngineTrivy       EngineID = "trivy"
 )
 
 // Capability represents what a scanner can do.
@@ -24,10 +25,11 @@ type Capability string
 
 // Available capabilities.
 const (
-	CapabilitySAST    Capability = "sast"
-	CapabilityVuln    Capability = "vuln"
-	CapabilitySecrets Capability = "secrets"
-	CapabilitySBOM    Capability = "sbom"
+	CapabilitySAST      Capability = "sast"
+	CapabilityVuln      Capability = "vuln"
+	CapabilitySecrets   Capability = "secrets"
+	CapabilitySBOM      Capability = "sbom"
+	CapabilityContainer Capability = "container"
 )
 
 // Target represents what to scan.

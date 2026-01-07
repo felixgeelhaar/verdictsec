@@ -7,6 +7,7 @@ import (
 	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/engines/gosec"
 	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/engines/govulncheck"
 	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/engines/staticcheck"
+	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/engines/trivy"
 )
 
 // NormalizerConfig holds severity mappings per engine.
@@ -15,6 +16,7 @@ type NormalizerConfig struct {
 	GovulncheckMappings map[string]finding.Severity
 	GitleaksMappings    map[string]finding.Severity
 	StaticcheckMappings map[string]finding.Severity
+	TrivyMappings       map[string]finding.Severity
 }
 
 // CompositeNormalizer dispatches to the appropriate engine normalizer.
@@ -23,6 +25,7 @@ type CompositeNormalizer struct {
 	govulncheckNorm *govulncheck.Normalizer
 	gitleaksNorm    *gitleaks.Normalizer
 	staticcheckNorm *staticcheck.Normalizer
+	trivyNorm       *trivy.Normalizer
 }
 
 // NewCompositeNormalizer creates a normalizer that handles all engines.
@@ -32,6 +35,7 @@ func NewCompositeNormalizer() *CompositeNormalizer {
 		govulncheckNorm: govulncheck.NewNormalizer(),
 		gitleaksNorm:    gitleaks.NewNormalizer(),
 		staticcheckNorm: staticcheck.NewNormalizer(),
+		trivyNorm:       trivy.NewNormalizer(),
 	}
 }
 
@@ -42,6 +46,7 @@ func NewCompositeNormalizerWithConfig(cfg NormalizerConfig) *CompositeNormalizer
 		govulncheckNorm: govulncheck.NewNormalizerWithOverrides(cfg.GovulncheckMappings),
 		gitleaksNorm:    gitleaks.NewNormalizerWithOverrides(cfg.GitleaksMappings),
 		staticcheckNorm: staticcheck.NewNormalizerWithOverrides(cfg.StaticcheckMappings),
+		trivyNorm:       trivy.NewNormalizer(),
 	}
 }
 
@@ -77,6 +82,8 @@ func (n *CompositeNormalizer) Normalize(engineID ports.EngineID, raw ports.RawFi
 		return n.gitleaksNorm.Normalize(engineID, raw)
 	case ports.EngineStaticcheck:
 		return n.staticcheckNorm.Normalize(engineID, raw)
+	case ports.EngineTrivy:
+		return n.trivyNorm.Normalize(engineID, raw)
 	case ports.EngineCycloneDX, ports.EngineSyft:
 		// CycloneDX and Syft produce SBOM, not findings - return nil
 		return nil
