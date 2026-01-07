@@ -84,6 +84,13 @@ type reportData struct {
 	DecisionClass string
 	IncludeStyles bool
 
+	// Security Score
+	ScoreValue       int
+	ScoreGrade       string
+	ScoreDescription string
+	ScoreClass       string
+	ScoreFactors     []scoreFactorData
+
 	// Counts
 	TotalFindings     int
 	CriticalCount     int
@@ -101,6 +108,15 @@ type reportData struct {
 
 	// Engine runs
 	EngineRuns []engineRunData
+}
+
+// scoreFactorData holds data for a score factor.
+type scoreFactorData struct {
+	Name       string
+	Points     int
+	PointsStr  string
+	Reason     string
+	IsPositive bool
 }
 
 // findingData holds data for a single finding.
@@ -173,6 +189,27 @@ func (w *HTMLWriter) buildReportData(a *assessment.Assessment, result services.E
 		Decision:      result.Decision.String(),
 		DecisionClass: w.decisionClass(result.Decision),
 		IncludeStyles: w.includeStyles,
+	}
+
+	// Build security score
+	data.ScoreValue = result.Score.Value
+	data.ScoreGrade = string(result.Score.Grade)
+	data.ScoreDescription = result.Score.Grade.Description()
+	data.ScoreClass = w.gradeClass(result.Score.Grade)
+	for _, f := range result.Score.Factors {
+		sign := "+"
+		isPositive := true
+		if f.Points < 0 {
+			sign = ""
+			isPositive = false
+		}
+		data.ScoreFactors = append(data.ScoreFactors, scoreFactorData{
+			Name:       f.Name,
+			Points:     f.Points,
+			PointsStr:  fmt.Sprintf("%s%d", sign, f.Points),
+			Reason:     f.Reason,
+			IsPositive: isPositive,
+		})
 	}
 
 	// Build summary counts
@@ -262,6 +299,20 @@ func (w *HTMLWriter) severityClass(s finding.Severity) string {
 		return "low"
 	default:
 		return "unknown"
+	}
+}
+
+// gradeClass returns CSS class for grade.
+func (w *HTMLWriter) gradeClass(g services.Grade) string {
+	switch g {
+	case services.GradeA, services.GradeB:
+		return "grade-good"
+	case services.GradeC:
+		return "grade-fair"
+	case services.GradeD, services.GradeF:
+		return "grade-poor"
+	default:
+		return ""
 	}
 }
 
@@ -362,6 +413,53 @@ const defaultTemplate = `<!DOCTYPE html>
         .stat.high .stat-value { color: var(--color-high); }
         .stat.medium .stat-value { color: var(--color-medium); }
         .stat.low .stat-value { color: var(--color-low); }
+        .score-card {
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+            margin-bottom: 1.5rem;
+        }
+        .score-display {
+            text-align: center;
+            min-width: 120px;
+        }
+        .score-value {
+            font-size: 3rem;
+            font-weight: 700;
+            line-height: 1;
+        }
+        .score-grade {
+            display: inline-block;
+            font-size: 1.5rem;
+            font-weight: 700;
+            width: 2.5rem;
+            height: 2.5rem;
+            line-height: 2.5rem;
+            border-radius: 50%;
+            margin-top: 0.5rem;
+        }
+        .grade-good .score-value { color: var(--color-pass); }
+        .grade-good .score-grade { background: #dcfce7; color: var(--color-pass); }
+        .grade-fair .score-value { color: var(--color-warn); }
+        .grade-fair .score-grade { background: #fef9c3; color: var(--color-warn); }
+        .grade-poor .score-value { color: var(--color-fail); }
+        .grade-poor .score-grade { background: #fee2e2; color: var(--color-fail); }
+        .score-factors {
+            flex: 1;
+        }
+        .score-factor {
+            display: flex;
+            gap: 0.75rem;
+            padding: 0.25rem 0;
+            font-size: 0.875rem;
+        }
+        .factor-points {
+            font-weight: 600;
+            min-width: 3rem;
+            text-align: right;
+        }
+        .factor-points.positive { color: var(--color-pass); }
+        .factor-points.negative { color: var(--color-fail); }
         .finding {
             border: 1px solid var(--color-border);
             border-radius: 0.375rem;
@@ -450,9 +548,29 @@ const defaultTemplate = `<!DOCTYPE html>
 
         <div class="card">
             <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem;">
-                <h2 style="margin: 0;">Summary</h2>
+                <h2 style="margin: 0;">Security Score</h2>
                 <span class="badge {{.DecisionClass}}">{{.Decision | upper}}</span>
             </div>
+            <div class="score-card {{.ScoreClass}}">
+                <div class="score-display">
+                    <div class="score-value">{{.ScoreValue}}</div>
+                    <div class="score-grade">{{.ScoreGrade}}</div>
+                </div>
+                {{if .ScoreFactors}}
+                <div class="score-factors">
+                    {{range .ScoreFactors}}
+                    <div class="score-factor">
+                        <span class="factor-points {{if .IsPositive}}positive{{else}}negative{{end}}">{{.PointsStr}}</span>
+                        <span>{{.Reason}}</span>
+                    </div>
+                    {{end}}
+                </div>
+                {{end}}
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Severity Breakdown</h2>
             <div class="stats">
                 <div class="stat critical">
                     <div class="stat-value">{{.CriticalCount}}</div>

@@ -29,6 +29,7 @@ type EvaluatePolicyOutput struct {
 type EvaluatePolicyUseCase struct {
 	policyService *services.PolicyEvaluationService
 	diffService   *services.DiffService
+	scoreService  *services.ScoreService
 	writer        ports.ArtifactWriter
 }
 
@@ -37,6 +38,7 @@ func NewEvaluatePolicyUseCase(writer ports.ArtifactWriter) *EvaluatePolicyUseCas
 	return &EvaluatePolicyUseCase{
 		policyService: services.NewPolicyEvaluationService(),
 		diffService:   services.NewDiffService(),
+		scoreService:  services.NewScoreService(),
 		writer:        writer,
 	}
 }
@@ -53,6 +55,16 @@ func (uc *EvaluatePolicyUseCase) Execute(_ context.Context, input EvaluatePolicy
 		input.Baseline,
 		input.Mode,
 	)
+
+	// Calculate diff for score bonuses
+	var diffResult *services.DiffResult
+	if input.Baseline != nil {
+		diff := uc.diffService.Diff(findings, input.Baseline)
+		diffResult = &diff
+	}
+
+	// Calculate security score
+	result.Score = uc.scoreService.Calculate(findings, input.Baseline, diffResult)
 
 	// Set decision on assessment
 	input.Assessment.SetDecision(result.Decision, result.Reasons)

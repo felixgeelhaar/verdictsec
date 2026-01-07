@@ -290,6 +290,55 @@ func (w *ConsoleWriter) writeSummary(a *assessment.Assessment, result services.E
 	}
 
 	fmt.Fprintln(w.out)
+
+	// Write security score
+	w.writeScore(result.Score)
+}
+
+// writeScore writes the security score with colored grade.
+func (w *ConsoleWriter) writeScore(score services.Score) {
+	fmt.Fprintf(w.out, "%s\n", w.bold("Security Score"))
+	fmt.Fprintf(w.out, "%s\n", strings.Repeat("-", 40))
+
+	// Format score with colored grade
+	gradeStr := w.gradeString(score.Grade)
+	fmt.Fprintf(w.out, "%s: %d/100 (%s)\n", w.bold("Score"), score.Value, gradeStr)
+
+	// Show factors if there are any
+	if len(score.Factors) > 0 && w.verbosity != ports.VerbosityQuiet {
+		fmt.Fprintln(w.out)
+		for _, factor := range score.Factors {
+			sign := "+"
+			colorFn := w.green
+			if factor.Points < 0 {
+				sign = ""
+				colorFn = w.red
+			}
+			fmt.Fprintf(w.out, "  %s: %s\n",
+				colorFn(fmt.Sprintf("%s%d", sign, factor.Points)),
+				factor.Reason)
+		}
+	}
+
+	fmt.Fprintln(w.out)
+}
+
+// gradeString returns a colored grade string.
+func (w *ConsoleWriter) gradeString(grade services.Grade) string {
+	switch grade {
+	case services.GradeA:
+		return w.green(string(grade))
+	case services.GradeB:
+		return w.green(string(grade))
+	case services.GradeC:
+		return w.yellow(string(grade))
+	case services.GradeD:
+		return w.yellow(string(grade))
+	case services.GradeF:
+		return w.red(string(grade))
+	default:
+		return string(grade)
+	}
 }
 
 // writeDecision writes the final decision.

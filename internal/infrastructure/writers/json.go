@@ -79,14 +79,30 @@ func (w *JSONWriter) WriteAssessment(a *assessment.Assessment, result services.E
 
 // WriteSummary writes a brief summary as JSON.
 func (w *JSONWriter) WriteSummary(a *assessment.Assessment, result services.EvaluationResult) error {
+	// Build score factors
+	scoreFactors := make([]JSONScoreFactor, len(result.Score.Factors))
+	for i, f := range result.Score.Factors {
+		scoreFactors[i] = JSONScoreFactor{
+			Name:   f.Name,
+			Points: f.Points,
+			Reason: f.Reason,
+		}
+	}
+
 	summary := JSONSummary{
-		Target:      a.Target(),
-		Decision:    result.Decision.String(),
-		TotalCount:  a.FindingCount(),
-		NewCount:    len(result.NewFindings),
-		ExistingCount: len(result.Existing),
+		Target:   a.Target(),
+		Decision: result.Decision.String(),
+		Score: JSONScore{
+			Value:       result.Score.Value,
+			Grade:       string(result.Score.Grade),
+			Description: result.Score.Grade.Description(),
+			Factors:     scoreFactors,
+		},
+		TotalCount:      a.FindingCount(),
+		NewCount:        len(result.NewFindings),
+		ExistingCount:   len(result.Existing),
 		SuppressedCount: len(result.Suppressed),
-		Duration:    a.Duration().String(),
+		Duration:        a.Duration().String(),
 	}
 	return w.writeJSON(summary)
 }
@@ -147,6 +163,16 @@ func (w *JSONWriter) buildOutput(a *assessment.Assessment, result services.Evalu
 		"low":      summary[finding.SeverityLow],
 	}
 
+	// Build score factors
+	scoreFactors := make([]JSONScoreFactor, len(result.Score.Factors))
+	for i, f := range result.Score.Factors {
+		scoreFactors[i] = JSONScoreFactor{
+			Name:   f.Name,
+			Points: f.Points,
+			Reason: f.Reason,
+		}
+	}
+
 	return JSONOutput{
 		Version:     "1",
 		AssessmentID: a.ID(),
@@ -163,6 +189,12 @@ func (w *JSONWriter) buildOutput(a *assessment.Assessment, result services.Evalu
 			NewCount:       len(result.NewFindings),
 			ExistingCount:  len(result.Existing),
 			SuppressedCount: len(result.Suppressed),
+		},
+		Score: JSONScore{
+			Value:       result.Score.Value,
+			Grade:       string(result.Score.Grade),
+			Description: result.Score.Grade.Description(),
+			Factors:     scoreFactors,
 		},
 		Decision: JSONDecision{
 			Result:  result.Decision.String(),
@@ -246,7 +278,23 @@ type JSONOutput struct {
 	EngineRuns   []JSONEngineRun      `json:"engine_runs"`
 	Findings     []JSONFinding        `json:"findings"`
 	Summary      JSONSummarySection   `json:"summary"`
+	Score        JSONScore            `json:"score"`
 	Decision     JSONDecision         `json:"decision"`
+}
+
+// JSONScore represents the security score in JSON.
+type JSONScore struct {
+	Value       int               `json:"value"`
+	Grade       string            `json:"grade"`
+	Description string            `json:"description"`
+	Factors     []JSONScoreFactor `json:"factors,omitempty"`
+}
+
+// JSONScoreFactor represents a score factor in JSON.
+type JSONScoreFactor struct {
+	Name   string `json:"name"`
+	Points int    `json:"points"`
+	Reason string `json:"reason"`
 }
 
 // JSONEngineRun represents an engine run in JSON.
@@ -305,13 +353,14 @@ type JSONDecision struct {
 
 // JSONSummary is a brief summary output.
 type JSONSummary struct {
-	Target          string `json:"target"`
-	Decision        string `json:"decision"`
-	TotalCount      int    `json:"total_findings"`
-	NewCount        int    `json:"new_findings"`
-	ExistingCount   int    `json:"existing_findings"`
-	SuppressedCount int    `json:"suppressed_findings"`
-	Duration        string `json:"duration"`
+	Target          string    `json:"target"`
+	Decision        string    `json:"decision"`
+	Score           JSONScore `json:"score"`
+	TotalCount      int       `json:"total_findings"`
+	NewCount        int       `json:"new_findings"`
+	ExistingCount   int       `json:"existing_findings"`
+	SuppressedCount int       `json:"suppressed_findings"`
+	Duration        string    `json:"duration"`
 }
 
 // JSONProgress represents a progress message.

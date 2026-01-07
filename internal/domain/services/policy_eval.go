@@ -16,6 +16,7 @@ type EvaluationResult struct {
 	NewFindings []*finding.Finding
 	Existing    []*finding.Finding
 	Suppressed  []*finding.Finding
+	Score       Score // Security score (0-100 with A-F grade)
 }
 
 // PolicyEvaluationService evaluates findings against policy.
