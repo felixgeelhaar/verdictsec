@@ -82,6 +82,8 @@ changelog:
 
 brews:
   - name: verdict
+    ids:
+      - tar
     repository:
       owner: felixgeelhaar
       name: homebrew-tap
