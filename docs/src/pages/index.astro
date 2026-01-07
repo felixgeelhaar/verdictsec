@@ -50,7 +50,7 @@ const features = [
   { icon: '🎯', title: 'Policy-Driven', description: 'Define thresholds, suppressions, and gating rules. Decisions derived from findings + policy — fully transparent.' },
   { icon: '📋', title: 'Baseline Management', description: 'Track existing findings with fingerprint-based baselines. Focus on new issues without noise from known items.' },
   { icon: '🔄', title: 'CI/CD Ready', description: 'Clear exit codes (0=PASS, 1=FAIL, 2=ERROR). Strict mode for pipelines. JSON and SARIF output formats.' },
-  { icon: '🤖', title: 'MCP Server', description: 'Integrate with AI assistants via Model Context Protocol. Expose security scanning as read-only tools and resources.' },
+  { icon: '🧠', title: 'AI Advisory', description: 'Opt-in AI explanations and remediation suggestions. Understand findings faster with Claude-powered insights. Advisory-only — never modifies decisions.' },
   { icon: '🔒', title: 'Secrets Redaction', description: 'Detected secrets are always redacted. Never stored raw, never logged. Security by design.' }
 ];
 ---
@@ -63,7 +63,7 @@ const features = [
     <section class="hero">
       <div class="hero-badge">
         <span class="hero-badge-dot"></span>
-        v0.5.3 — Now with MCP Server
+        v0.7.0 — Now with AI Advisory
       </div>
       <h1>Security scanning<br>for <span class="accent">Go</span> codebases</h1>
       <p class="hero-subtitle">
@@ -141,10 +141,10 @@ const features = [
     <section id="mcp" class="mcp-full-section">
       <div class="section-header">
         <div class="section-label">AI Integration</div>
-        <h2 class="section-title">Model Context Protocol Server</h2>
+        <h2 class="section-title">MCP Server & AI Advisory</h2>
         <p class="section-subtitle">
-          Expose security scanning to AI assistants. Run scans, check policies, and manage
-          baselines directly from Claude Code or any MCP-compatible client.
+          Expose security scanning to AI assistants via MCP. Get AI-powered explanations
+          and remediation suggestions for findings. Advisory-only — AI never modifies decisions.
         </p>
       </div>
 
@@ -152,7 +152,7 @@ const features = [
         <div class="mcp-card mcp-tools">
           <h3>
             <span class="mcp-icon">⚡</span>
-            MCP Tools
+            Scanning Tools
           </h3>
           <ul class="mcp-list">
             <li><code>verdict_scan</code> — Run full security scan</li>
@@ -166,10 +166,12 @@ const features = [
 
         <div class="mcp-card mcp-resources">
           <h3>
-            <span class="mcp-icon">📚</span>
-            MCP Resources
+            <span class="mcp-icon">🧠</span>
+            AI Advisory Tools
           </h3>
           <ul class="mcp-list">
+            <li><code>verdict_explain</code> — AI explanation of findings</li>
+            <li><code>verdict_remediate</code> — AI remediation suggestions</li>
             <li><code>verdict://config</code> — Current configuration</li>
             <li><code>verdict://baseline</code> — Baseline fingerprints</li>
             <li><code>verdict://engines</code> — Available engines</li>
@@ -241,7 +243,11 @@ verdict ci
 verdict sast      <span class="comment"># Static analysis only</span>
 verdict vuln      <span class="comment"># Vulnerability scan only</span>
 verdict secrets   <span class="comment"># Secrets detection only</span>
-verdict sbom      <span class="comment"># Generate SBOM</span>`}
+verdict sbom      <span class="comment"># Generate SBOM</span>
+
+<span class="comment"># AI-powered advisory (requires ANTHROPIC_API_KEY)</span>
+verdict explain &lt;finding-id&gt;   <span class="comment"># Explain a finding</span>
+verdict ai summarize           <span class="comment"># Posture summary</span>`}
             copyText="verdict scan"
           />
         </div>
