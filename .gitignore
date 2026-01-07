@@ -26,3 +26,6 @@ Thumbs.db
 
 # Playwright MCP screenshots
 .playwright-mcp/
+
+# Relicta release state
+.relicta/
