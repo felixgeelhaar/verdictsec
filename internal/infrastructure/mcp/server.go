@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/felixgeelhaar/mcp-go"
@@ -142,9 +143,10 @@ func (s *Server) registerResources() {
 
 // ScanInput defines the input for scan operations.
 type ScanInput struct {
-	Path    string   `json:"path" jsonschema:"description=Path to the Go project to scan"`
-	Engines []string `json:"engines,omitempty" jsonschema:"description=Specific engines to use (gosec, govulncheck, gitleaks)"`
-	Strict  bool     `json:"strict,omitempty" jsonschema:"description=Enable strict mode (fail on any finding above threshold)"`
+	Path     string   `json:"path" jsonschema:"description=Path to the Go project to scan"`
+	Engines  []string `json:"engines,omitempty" jsonschema:"description=Specific engines to use (gosec, govulncheck, gitleaks)"`
+	Strict   bool     `json:"strict,omitempty" jsonschema:"description=Enable strict mode (fail on any finding above threshold)"`
+	Baseline string   `json:"baseline,omitempty" jsonschema:"description=Path to baseline file. Auto-detects if not specified."`
 }
 
 // ScanResult represents the result of a scan operation.
@@ -258,7 +260,7 @@ func (s *Server) runScan(ctx context.Context, input ScanInput, forceEngines []po
 	allFindings := output.Assessment.Findings()
 
 	// Load baseline and filter out baselined findings
-	bl := s.loadBaseline()
+	bl := s.loadBaseline(input.Baseline)
 	var activeFindings []*finding.Finding
 	var baselinedCount int
 
@@ -343,20 +345,54 @@ func (s *Server) runScan(ctx context.Context, input ScanInput, forceEngines []po
 	return result, nil
 }
 
-// loadBaseline loads the baseline from the configured path.
+// loadBaseline loads the baseline from the specified path or auto-detects it.
 // Returns nil if baseline doesn't exist or cannot be loaded.
-func (s *Server) loadBaseline() *domainbaseline.Baseline {
-	blPath := s.config.Baseline.Path
-	if blPath == "" {
-		blPath = ".verdict/baseline.json"
+// Auto-detection checks these paths in order:
+// 1. Explicitly specified path (inputPath)
+// 2. Config-specified path (s.config.Baseline.Path)
+// 3. .verdict/baseline.json (default)
+// 4. .verdict-baseline.json (alternate)
+// 5. baseline.json (root)
+func (s *Server) loadBaseline(inputPath string) *domainbaseline.Baseline {
+	// Build list of paths to try
+	var pathsToTry []string
+
+	// 1. Explicitly specified path takes priority
+	if inputPath != "" {
+		pathsToTry = append(pathsToTry, inputPath)
 	}
 
-	store := baseline.NewStoreWithPath(blPath)
-	bl, err := store.Load()
-	if err != nil {
-		return nil
+	// 2. Config-specified path
+	if s.config.Baseline.Path != "" {
+		pathsToTry = append(pathsToTry, s.config.Baseline.Path)
 	}
-	return bl
+
+	// 3. Auto-detect common locations
+	autoDetectPaths := []string{
+		".verdict/baseline.json",
+		".verdict-baseline.json",
+		"baseline.json",
+	}
+
+	for _, p := range autoDetectPaths {
+		pathsToTry = append(pathsToTry, p)
+	}
+
+	// Try each path in order
+	for _, blPath := range pathsToTry {
+		// Check if file exists before trying to load
+		if _, err := os.Stat(blPath); err != nil {
+			continue
+		}
+
+		store := baseline.NewStoreWithPath(blPath)
+		bl, err := store.Load()
+		if err == nil && bl != nil {
+			return bl
+		}
+	}
+
+	return nil
 }
 
 // BaselineAddInput defines input for adding to baseline.
@@ -454,7 +490,8 @@ func (s *Server) handleBaselineAdd(ctx context.Context, input BaselineAddInput) 
 
 // PolicyCheckInput defines input for policy checking.
 type PolicyCheckInput struct {
-	Path string `json:"path" jsonschema:"description=Path to the Go project to check"`
+	Path     string `json:"path" jsonschema:"description=Path to the Go project to check"`
+	Baseline string `json:"baseline,omitempty" jsonschema:"description=Path to baseline file. Auto-detects if not specified."`
 }
 
 // PolicyCheckResult represents the result of a policy check.
@@ -507,7 +544,7 @@ func (s *Server) handlePolicyCheck(ctx context.Context, input PolicyCheckInput) 
 	}
 
 	// Load baseline and filter out baselined findings
-	bl := s.loadBaseline()
+	bl := s.loadBaseline(input.Baseline)
 	allFindings := scanOutput.Assessment.Findings()
 	var activeFindings []*finding.Finding
 	var baselinedCount int
