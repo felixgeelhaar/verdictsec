@@ -12,6 +12,7 @@ import (
 	domainbaseline "github.com/felixgeelhaar/verdictsec/internal/domain/baseline"
 	"github.com/felixgeelhaar/verdictsec/internal/domain/finding"
 	"github.com/felixgeelhaar/verdictsec/internal/domain/services"
+	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/ai"
 	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/baseline"
 	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/config"
 	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/engines"
@@ -103,6 +104,16 @@ func (s *Server) registerTools() {
 	s.mcpServer.Tool("verdict_policy_check").
 		Description("Evaluate findings against the configured security policy.").
 		Handler(s.handlePolicyCheck)
+
+	// verdict_explain - AI explanation of findings (advisory only)
+	s.mcpServer.Tool("verdict_explain").
+		Description("Use AI to generate an explanation of a security finding. Advisory only.").
+		Handler(s.handleExplain)
+
+	// verdict_remediate - AI remediation suggestions (advisory only)
+	s.mcpServer.Tool("verdict_remediate").
+		Description("Use AI to generate remediation suggestions for a security finding. Advisory only.").
+		Handler(s.handleRemediate)
 }
 
 // registerResources registers all VerdictSec MCP resources.
@@ -726,4 +737,181 @@ func getModeString(strict bool) string {
 		return "ci"
 	}
 	return "local"
+}
+
+// ExplainInput defines input for AI explanation.
+type ExplainInput struct {
+	FindingID   string `json:"finding_id" jsonschema:"description=ID of the finding to explain"`
+	RuleID      string `json:"rule_id,omitempty" jsonschema:"description=Rule ID of the finding"`
+	Title       string `json:"title,omitempty" jsonschema:"description=Title/message of the finding"`
+	Severity    string `json:"severity,omitempty" jsonschema:"description=Severity of the finding"`
+	Description string `json:"description,omitempty" jsonschema:"description=Description of the finding"`
+	File        string `json:"file,omitempty" jsonschema:"description=File path where the finding was detected"`
+	Line        int    `json:"line,omitempty" jsonschema:"description=Line number of the finding"`
+}
+
+// ExplainResult represents the result of an AI explanation.
+type ExplainResult struct {
+	FindingID   string   `json:"finding_id"`
+	Summary     string   `json:"summary"`
+	Details     string   `json:"details"`
+	RiskContext string   `json:"risk_context"`
+	References  []string `json:"references"`
+	Provider    string   `json:"provider"`
+	Model       string   `json:"model"`
+	Advisory    bool     `json:"advisory"`
+}
+
+func (s *Server) handleExplain(ctx context.Context, input ExplainInput) (*ExplainResult, error) {
+	// Check if AI is enabled
+	if !s.config.AI.Enabled {
+		return nil, fmt.Errorf("AI features are not enabled. Set ai.enabled: true in your config")
+	}
+
+	// Create advisor
+	advisorConfig := s.config.ToAdvisorConfig()
+	advisor := ai.NewAdvisor(advisorConfig)
+
+	if !advisor.IsAvailable() {
+		return nil, fmt.Errorf("AI advisor not available. Check your ANTHROPIC_API_KEY environment variable")
+	}
+
+	// Create finding from input
+	severity := finding.SeverityMedium
+	if input.Severity != "" {
+		switch input.Severity {
+		case "CRITICAL":
+			severity = finding.SeverityCritical
+		case "HIGH":
+			severity = finding.SeverityHigh
+		case "MEDIUM":
+			severity = finding.SeverityMedium
+		case "LOW":
+			severity = finding.SeverityLow
+		}
+	}
+
+	f := finding.NewFinding(
+		finding.FindingTypeSAST,
+		"mcp",
+		input.RuleID,
+		input.Title,
+		severity,
+		finding.NewLocationSimple(input.File, input.Line),
+		finding.WithDescription(input.Description),
+	)
+
+	// Generate explanation
+	explanation, err := advisor.Explain(ctx, f)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate explanation: %w", err)
+	}
+
+	return &ExplainResult{
+		FindingID:   input.FindingID,
+		Summary:     explanation.Summary(),
+		Details:     explanation.Details(),
+		RiskContext: explanation.RiskContext(),
+		References:  explanation.References(),
+		Provider:    explanation.Provider(),
+		Model:       explanation.Model(),
+		Advisory:    true,
+	}, nil
+}
+
+// RemediateInput defines input for AI remediation.
+type RemediateInput struct {
+	FindingID   string `json:"finding_id" jsonschema:"description=ID of the finding to remediate"`
+	RuleID      string `json:"rule_id,omitempty" jsonschema:"description=Rule ID of the finding"`
+	Title       string `json:"title,omitempty" jsonschema:"description=Title/message of the finding"`
+	Severity    string `json:"severity,omitempty" jsonschema:"description=Severity of the finding"`
+	Description string `json:"description,omitempty" jsonschema:"description=Description of the finding"`
+	File        string `json:"file,omitempty" jsonschema:"description=File path where the finding was detected"`
+	Line        int    `json:"line,omitempty" jsonschema:"description=Line number of the finding"`
+	IncludeCode bool   `json:"include_code,omitempty" jsonschema:"description=Include code suggestions"`
+}
+
+// RemediateResult represents the result of AI remediation suggestions.
+type RemediateResult struct {
+	FindingID       string   `json:"finding_id"`
+	Priority        string   `json:"priority"`
+	Summary         string   `json:"summary"`
+	Steps           []string `json:"steps"`
+	CodeSuggestions []any    `json:"code_suggestions,omitempty"`
+	Effort          string   `json:"effort"`
+	Impact          string   `json:"impact"`
+	References      []string `json:"references"`
+	Provider        string   `json:"provider"`
+	Model           string   `json:"model"`
+	Advisory        bool     `json:"advisory"`
+}
+
+func (s *Server) handleRemediate(ctx context.Context, input RemediateInput) (*RemediateResult, error) {
+	// Check if AI is enabled
+	if !s.config.AI.Enabled {
+		return nil, fmt.Errorf("AI features are not enabled. Set ai.enabled: true in your config")
+	}
+
+	// Create advisor
+	advisorConfig := s.config.ToAdvisorConfig()
+	advisor := ai.NewAdvisor(advisorConfig)
+
+	if !advisor.IsAvailable() {
+		return nil, fmt.Errorf("AI advisor not available. Check your ANTHROPIC_API_KEY environment variable")
+	}
+
+	// Create finding from input
+	severity := finding.SeverityMedium
+	if input.Severity != "" {
+		switch input.Severity {
+		case "CRITICAL":
+			severity = finding.SeverityCritical
+		case "HIGH":
+			severity = finding.SeverityHigh
+		case "MEDIUM":
+			severity = finding.SeverityMedium
+		case "LOW":
+			severity = finding.SeverityLow
+		}
+	}
+
+	f := finding.NewFinding(
+		finding.FindingTypeSAST,
+		"mcp",
+		input.RuleID,
+		input.Title,
+		severity,
+		finding.NewLocationSimple(input.File, input.Line),
+		finding.WithDescription(input.Description),
+	)
+
+	// Generate remediation
+	opts := ports.RemediationOptions{
+		IncludeCode: input.IncludeCode,
+	}
+
+	remediation, err := advisor.Remediate(ctx, f, opts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate remediation: %w", err)
+	}
+
+	// Convert code suggestions
+	var codeSuggestions []any
+	for _, cs := range remediation.CodeSuggestions() {
+		codeSuggestions = append(codeSuggestions, cs)
+	}
+
+	return &RemediateResult{
+		FindingID:       input.FindingID,
+		Priority:        string(remediation.Priority()),
+		Summary:         remediation.Summary(),
+		Steps:           remediation.Steps(),
+		CodeSuggestions: codeSuggestions,
+		Effort:          remediation.Effort(),
+		Impact:          remediation.Impact(),
+		References:      remediation.References(),
+		Provider:        remediation.Provider(),
+		Model:           remediation.Model(),
+		Advisory:        true,
+	}, nil
 }

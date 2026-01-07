@@ -17,6 +17,34 @@ type Config struct {
 	Output   OutputConfig   `yaml:"output" json:"output"`
 	Baseline BaselineConfig `yaml:"baseline" json:"baseline"`
 	MCP      MCPConfig      `yaml:"mcp" json:"mcp"`
+	AI       AIConfig       `yaml:"ai" json:"ai"`
+}
+
+// AIConfig holds AI advisor configuration.
+type AIConfig struct {
+	// Enabled controls whether AI features are available.
+	Enabled bool `yaml:"enabled" json:"enabled"`
+
+	// Provider is the default AI provider (claude, openai, local).
+	Provider string `yaml:"provider" json:"provider"`
+
+	// Model is the model ID to use.
+	Model string `yaml:"model" json:"model"`
+
+	// Features controls which AI features are enabled.
+	Features AIFeatures `yaml:"features" json:"features"`
+}
+
+// AIFeatures controls which AI features are enabled.
+type AIFeatures struct {
+	// Explain enables finding explanations.
+	Explain bool `yaml:"explain" json:"explain"`
+
+	// Remediate enables remediation suggestions.
+	Remediate bool `yaml:"remediate" json:"remediate"`
+
+	// Summarize enables posture summaries.
+	Summarize bool `yaml:"summarize" json:"summarize"`
 }
 
 // PolicyConfig defines policy settings for scan results.
@@ -151,6 +179,30 @@ func DefaultConfig() *Config {
 			MaxFindings:      50,    // Default: return up to 50 findings
 			MaxOutputBytes:   50000, // Default: ~50KB output limit
 			TruncateStrategy: TruncateStrategyPriority,
+		},
+		AI: AIConfig{
+			Enabled:  false, // Opt-in by default
+			Provider: "claude",
+			Model:    "claude-3-5-sonnet-20241022",
+			Features: AIFeatures{
+				Explain:   true,
+				Remediate: true,
+				Summarize: true,
+			},
+		},
+	}
+}
+
+// ToAdvisorConfig converts AIConfig to ports.AdvisorConfig.
+func (c *Config) ToAdvisorConfig() ports.AdvisorConfig {
+	return ports.AdvisorConfig{
+		Enabled:  c.AI.Enabled,
+		Provider: c.AI.Provider,
+		Model:    c.AI.Model,
+		Features: ports.AdvisorFeatures{
+			Explain:   c.AI.Features.Explain,
+			Remediate: c.AI.Features.Remediate,
+			Summarize: c.AI.Features.Summarize,
 		},
 	}
 }
