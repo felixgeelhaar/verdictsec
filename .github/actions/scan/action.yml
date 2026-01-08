@@ -104,8 +104,8 @@ runs:
         # Install govulncheck
         go install golang.org/x/vuln/cmd/govulncheck@latest
 
-        # Install gitleaks
-        go install github.com/gitleaks/gitleaks/v8@latest
+        # Install gitleaks (use zricethezav path due to module rename)
+        go install github.com/zricethezav/gitleaks/v8@latest
 
         # Install cyclonedx-gomod
         go install github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@latest
