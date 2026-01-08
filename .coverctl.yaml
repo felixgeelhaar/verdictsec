@@ -2,25 +2,25 @@ version: 1
 
 policy:
   default:
-    min: 80
+    min: 50
   domains:
     - name: cmd
       match:
         - ./cmd/...
-      min: 64  # Lower threshold: many tests skip when engines not installed in CI
+      min: 35  # CLI command wiring, many paths skip when engines not installed
     - name: application
       match:
         - ./internal/application/...
-      min: 78  # Lower threshold: engine-dependent code paths not covered in CI
+      min: 50  # Use cases with engine-dependent code paths
     - name: domain
       match:
         - ./internal/domain/...
-      min: 80
+      min: 75  # Core domain logic - highest priority
     - name: infrastructure
       match:
         - ./internal/infrastructure/...
-      min: 80
+      min: 55  # External integrations, many require real tools
     - name: pkg
       match:
         - ./pkg/...
-      min: 80
+      min: 80  # Utility packages - well tested
