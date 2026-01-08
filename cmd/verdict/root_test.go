@@ -641,6 +641,8 @@ engines:
     enabled: false
   staticcheck:
     enabled: false
+  trivy:
+    enabled: false
 `)
 	require.NoError(t, os.WriteFile(configPath, content, 0644))
 
@@ -680,6 +682,8 @@ engines:
   syft:
     enabled: false
   staticcheck:
+    enabled: false
+  trivy:
     enabled: false
 `)
 	require.NoError(t, os.WriteFile(configPath, content, 0644))
@@ -721,6 +725,8 @@ engines:
     enabled: false
   staticcheck:
     enabled: false
+  trivy:
+    enabled: false
 `)
 	require.NoError(t, os.WriteFile(configPath, content, 0644))
 
@@ -760,6 +766,8 @@ engines:
   syft:
     enabled: false
   staticcheck:
+    enabled: false
+  trivy:
     enabled: false
 `)
 	require.NoError(t, os.WriteFile(configPath, content, 0644))

@@ -30,6 +30,7 @@ var (
 	summaryOnly    bool
 	watchMode      bool
 	watchDebounce  time.Duration
+	noInline       bool
 )
 
 // scanCmd performs a full security scan
@@ -66,6 +67,7 @@ func init() {
 	scanCmd.Flags().BoolVar(&summaryOnly, "summary", false, "show summary only")
 	scanCmd.Flags().BoolVarP(&watchMode, "watch", "w", false, "watch for file changes and re-run scan")
 	scanCmd.Flags().DurationVar(&watchDebounce, "watch-debounce", 500*time.Millisecond, "debounce duration for watch mode")
+	scanCmd.Flags().BoolVar(&noInline, "no-inline", false, "disable inline suppression comments (// verdict:ignore)")
 
 	rootCmd.AddCommand(scanCmd)
 }
@@ -179,12 +181,17 @@ func runScan(cmd *cobra.Command, args []string) error {
 		mode = policy.ModeCI
 	}
 
+	// Determine if inline suppressions are enabled
+	inlineSuppressionsEnabled := cfg.IsInlineSuppressionsEnabled() && !noInline
+
 	// Evaluate against policy
 	evalInput := usecases.EvaluatePolicyInput{
-		Assessment: scanOutput.Assessment,
-		Policy:     &pol,
-		Baseline:   bl,
-		Mode:       mode,
+		Assessment:                scanOutput.Assessment,
+		Policy:                    &pol,
+		Baseline:                  bl,
+		Mode:                      mode,
+		InlineSuppressionsEnabled: inlineSuppressionsEnabled,
+		TargetDir:                 target,
 	}
 	evalOutput := evalUseCase.Execute(ctx, evalInput)
 
@@ -236,6 +243,9 @@ func determineEngines(cfg *config.Config) []string {
 	}
 	if cfg.Engines.Syft.Enabled {
 		engineIDs = append(engineIDs, "syft")
+	}
+	if cfg.Engines.Trivy.Enabled {
+		engineIDs = append(engineIDs, "trivy")
 	}
 
 	// Apply exclusions
@@ -389,12 +399,17 @@ func runSingleScan(ctx context.Context, cfg *config.Config, target string, write
 		mode = policy.ModeCI
 	}
 
+	// Determine if inline suppressions are enabled
+	inlineSuppressionsEnabled := cfg.IsInlineSuppressionsEnabled() && !noInline
+
 	// Evaluate against policy
 	evalInput := usecases.EvaluatePolicyInput{
-		Assessment: scanOutput.Assessment,
-		Policy:     &pol,
-		Baseline:   bl,
-		Mode:       mode,
+		Assessment:                scanOutput.Assessment,
+		Policy:                    &pol,
+		Baseline:                  bl,
+		Mode:                      mode,
+		InlineSuppressionsEnabled: inlineSuppressionsEnabled,
+		TargetDir:                 target,
 	}
 	evalOutput := evalUseCase.Execute(ctx, evalInput)
 

@@ -321,8 +321,8 @@ func TestNewDefaultRegistry(t *testing.T) {
 	registry := NewDefaultRegistry()
 
 	assert.NotNil(t, registry)
-	// Default registry should have 6 engines: gosec, govulncheck, gitleaks, cyclonedx, syft, staticcheck
-	assert.Equal(t, 6, registry.Count())
+	// Default registry should have 7 engines: gosec, govulncheck, gitleaks, cyclonedx, syft, staticcheck, trivy
+	assert.Equal(t, 7, registry.Count())
 
 	// Verify all expected engines are registered
 	_, hasGosec := registry.Get(ports.EngineGosec)
@@ -342,6 +342,9 @@ func TestNewDefaultRegistry(t *testing.T) {
 
 	_, hasStaticcheck := registry.Get(ports.EngineStaticcheck)
 	assert.True(t, hasStaticcheck)
+
+	_, hasTrivy := registry.Get(ports.EngineTrivy)
+	assert.True(t, hasTrivy)
 }
 
 func TestNewDefaultRegistry_EngineCapabilities(t *testing.T) {
@@ -359,13 +362,27 @@ func TestNewDefaultRegistry_EngineCapabilities(t *testing.T) {
 	assert.Contains(t, sastEngineIDs, ports.EngineGosec)
 	assert.Contains(t, sastEngineIDs, ports.EngineStaticcheck)
 
+	// Two Vuln engines: govulncheck (Go-specific) and trivy (general purpose)
 	vulnEngines := registry.GetByCapability(ports.CapabilityVuln)
-	assert.Len(t, vulnEngines, 1)
-	assert.Equal(t, ports.EngineGovulncheck, vulnEngines[0].ID())
+	assert.Len(t, vulnEngines, 2)
 
+	vulnEngineIDs := make([]ports.EngineID, len(vulnEngines))
+	for i, e := range vulnEngines {
+		vulnEngineIDs[i] = e.ID()
+	}
+	assert.Contains(t, vulnEngineIDs, ports.EngineGovulncheck)
+	assert.Contains(t, vulnEngineIDs, ports.EngineTrivy)
+
+	// Two Secrets engines: gitleaks (git-focused) and trivy (general purpose)
 	secretsEngines := registry.GetByCapability(ports.CapabilitySecrets)
-	assert.Len(t, secretsEngines, 1)
-	assert.Equal(t, ports.EngineGitleaks, secretsEngines[0].ID())
+	assert.Len(t, secretsEngines, 2)
+
+	secretsEngineIDs := make([]ports.EngineID, len(secretsEngines))
+	for i, e := range secretsEngines {
+		secretsEngineIDs[i] = e.ID()
+	}
+	assert.Contains(t, secretsEngineIDs, ports.EngineGitleaks)
+	assert.Contains(t, secretsEngineIDs, ports.EngineTrivy)
 
 	// Two SBOM engines: cyclonedx (module-level) and syft (artifact-level)
 	sbomEngines := registry.GetByCapability(ports.CapabilitySBOM)
@@ -377,6 +394,10 @@ func TestNewDefaultRegistry_EngineCapabilities(t *testing.T) {
 	}
 	assert.Contains(t, sbomEngineIDs, ports.EngineCycloneDX)
 	assert.Contains(t, sbomEngineIDs, ports.EngineSyft)
+
+	// Note: Container capability is not in default registry.
+	// Trivy's filesystem adapter (default) has Vuln+Secrets capabilities.
+	// Container capability requires the image adapter (trivy.NewImageAdapter()).
 }
 
 func TestRegistry_Unavailable(t *testing.T) {

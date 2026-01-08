@@ -83,6 +83,7 @@ type EnginesConfig struct {
 	CycloneDX   EngineSettings `yaml:"cyclonedx-gomod" json:"cyclonedx-gomod"`
 	Syft        EngineSettings `yaml:"syft" json:"syft"`
 	Staticcheck EngineSettings `yaml:"staticcheck" json:"staticcheck"`
+	Trivy       EngineSettings `yaml:"trivy" json:"trivy"`
 }
 
 // EngineSettings holds settings for a single engine.
@@ -175,6 +176,12 @@ func DefaultConfig() *Config {
 				Exclude:  []string{},
 				Settings: map[string]string{},
 			},
+			Trivy: EngineSettings{
+				Enabled:  false, // Disabled by default - opt-in for container scanning
+				Severity: "LOW",
+				Exclude:  []string{},
+				Settings: map[string]string{},
+			},
 		},
 		Output: OutputConfig{
 			Format:    "console",
@@ -229,6 +236,7 @@ func (c *Config) ToPortsConfig() ports.Config {
 			ports.EngineCycloneDX:   c.toEngineConfig(c.Engines.CycloneDX),
 			ports.EngineSyft:        c.toEngineConfig(c.Engines.Syft),
 			ports.EngineStaticcheck: c.toEngineConfig(c.Engines.Staticcheck),
+			ports.EngineTrivy:       c.toEngineConfig(c.Engines.Trivy),
 		},
 		Output: ports.OutputConfig{
 			Format:    c.GetOutputFormat(),
