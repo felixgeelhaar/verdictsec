@@ -141,17 +141,20 @@ runs:
           CMD="$CMD --strict"
         fi
 
-        if [ -n "${{ inputs.output-format }}" ] && [ "${{ inputs.output-format }}" != "console" ]; then
-          CMD="$CMD --format ${{ inputs.output-format }}"
+        # Output format (--json or --sarif)
+        if [ "${{ inputs.output-format }}" = "sarif" ]; then
+          CMD="$CMD --sarif"
+        elif [ "${{ inputs.output-format }}" = "json" ]; then
+          CMD="$CMD --json"
         fi
 
+        # Output file
         if [ -n "${{ inputs.output-file }}" ]; then
           CMD="$CMD --output ${{ inputs.output-file }}"
         fi
 
-        if [ -n "${{ inputs.fail-on }}" ]; then
-          CMD="$CMD --fail-on ${{ inputs.fail-on }}"
-        fi
+        # Fail threshold (not a flag - uses config)
+        # Note: fail-on is handled via config, not CLI flag
 
         if [ -n "${{ inputs.engines }}" ]; then
           CMD="$CMD --include ${{ inputs.engines }}"
