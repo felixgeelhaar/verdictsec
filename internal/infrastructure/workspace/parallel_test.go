@@ -175,10 +175,10 @@ func TestParallelScanner_ScanWithFilter(t *testing.T) {
 		{Path: "pkg/common", Name: "github.com/test/common"},
 	}
 
-	var scannedModules []string
+	var scannedCount int32
 
 	scanFn := func(ctx context.Context, target ports.Target) (*assessment.Assessment, error) {
-		scannedModules = append(scannedModules, target.Path)
+		atomic.AddInt32(&scannedCount, 1)
 		return assessment.NewAssessment(target.Path), nil
 	}
 
@@ -188,8 +188,8 @@ func TestParallelScanner_ScanWithFilter(t *testing.T) {
 		t.Fatalf("ScanWithFilter failed: %v", err)
 	}
 
-	if len(scannedModules) != 2 {
-		t.Errorf("expected 2 modules scanned, got %d", len(scannedModules))
+	if atomic.LoadInt32(&scannedCount) != 2 {
+		t.Errorf("expected 2 modules scanned, got %d", scannedCount)
 	}
 }
 
