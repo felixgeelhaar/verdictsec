@@ -1,0 +1,38 @@
+name: Test Security Action
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/actions/scan/**'
+      - '.github/workflows/test-action.yml'
+
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: write
+
+jobs:
+  test-action:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run VerdictSec Security Scan
+        uses: ./.github/actions/scan
+        with:
+          path: '.'
+          output-format: 'sarif'
+          upload-sarif: 'true'
+          fail-on: 'critical'
+        continue-on-error: true
+
+      - name: Verify SARIF output
+        run: |
+          if [ -f "verdict-results.sarif" ]; then
+            echo "✅ SARIF file generated"
+            head -50 verdict-results.sarif
+          else
+            echo "❌ SARIF file not found"
+            exit 1
+          fi
