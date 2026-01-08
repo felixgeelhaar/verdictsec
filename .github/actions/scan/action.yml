@@ -1,0 +1,204 @@
+name: 'VerdictSec Security Scan'
+description: 'Run comprehensive Go security scans with VerdictSec - SAST, vulnerability detection, secrets scanning, and SBOM generation'
+author: 'Felix Geelhaar'
+
+branding:
+  icon: 'shield'
+  color: 'green'
+
+inputs:
+  path:
+    description: 'Path to scan (default: current directory)'
+    required: false
+    default: '.'
+  mode:
+    description: 'Scan mode: scan (default), ci, sast, vuln, secrets'
+    required: false
+    default: 'ci'
+  strict:
+    description: 'Enable strict mode (fail on warnings)'
+    required: false
+    default: 'true'
+  output-format:
+    description: 'Output format: console, json, sarif'
+    required: false
+    default: 'sarif'
+  output-file:
+    description: 'Output file path for results'
+    required: false
+    default: 'verdict-results.sarif'
+  fail-on:
+    description: 'Severity threshold to fail: critical, high, medium, low'
+    required: false
+    default: 'high'
+  engines:
+    description: 'Comma-separated list of engines to run (default: all enabled)'
+    required: false
+    default: ''
+  exclude-engines:
+    description: 'Comma-separated list of engines to exclude'
+    required: false
+    default: ''
+  baseline:
+    description: 'Path to baseline file for suppressing known findings'
+    required: false
+    default: ''
+  config:
+    description: 'Path to VerdictSec configuration file'
+    required: false
+    default: ''
+  pr-annotations:
+    description: 'Post findings as PR review comments (requires GITHUB_TOKEN)'
+    required: false
+    default: 'true'
+  upload-sarif:
+    description: 'Upload SARIF results to GitHub Security tab'
+    required: false
+    default: 'true'
+  version:
+    description: 'VerdictSec version to use (default: latest)'
+    required: false
+    default: 'latest'
+
+outputs:
+  exit-code:
+    description: 'Exit code from VerdictSec (0=pass, 1=fail, 2=error)'
+    value: ${{ steps.scan.outputs.exit-code }}
+  findings-count:
+    description: 'Total number of findings'
+    value: ${{ steps.scan.outputs.findings-count }}
+  critical-count:
+    description: 'Number of critical findings'
+    value: ${{ steps.scan.outputs.critical-count }}
+  high-count:
+    description: 'Number of high findings'
+    value: ${{ steps.scan.outputs.high-count }}
+  sarif-file:
+    description: 'Path to SARIF output file'
+    value: ${{ steps.scan.outputs.sarif-file }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: 'stable'
+        cache: true
+
+    - name: Install VerdictSec
+      shell: bash
+      run: |
+        if [ "${{ inputs.version }}" = "latest" ]; then
+          go install github.com/felixgeelhaar/verdictsec/cmd/verdict@latest
+        else
+          go install github.com/felixgeelhaar/verdictsec/cmd/verdict@${{ inputs.version }}
+        fi
+
+    - name: Install Security Tools
+      shell: bash
+      run: |
+        # Install gosec
+        go install github.com/securego/gosec/v2/cmd/gosec@latest
+
+        # Install govulncheck
+        go install golang.org/x/vuln/cmd/govulncheck@latest
+
+        # Install gitleaks
+        go install github.com/gitleaks/gitleaks/v8@latest
+
+        # Install cyclonedx-gomod
+        go install github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@latest
+
+        # Install trivy
+        curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b $(go env GOPATH)/bin latest
+
+    - name: Run VerdictSec Scan
+      id: scan
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+      run: |
+        set +e
+
+        # Build command
+        CMD="verdict"
+
+        # Mode selection
+        case "${{ inputs.mode }}" in
+          ci) CMD="$CMD ci" ;;
+          sast) CMD="$CMD sast" ;;
+          vuln) CMD="$CMD vuln" ;;
+          secrets) CMD="$CMD secrets" ;;
+          *) CMD="$CMD scan" ;;
+        esac
+
+        # Add path
+        CMD="$CMD ${{ inputs.path }}"
+
+        # Add options
+        if [ "${{ inputs.strict }}" = "true" ]; then
+          CMD="$CMD --strict"
+        fi
+
+        if [ -n "${{ inputs.output-format }}" ] && [ "${{ inputs.output-format }}" != "console" ]; then
+          CMD="$CMD --format ${{ inputs.output-format }}"
+        fi
+
+        if [ -n "${{ inputs.output-file }}" ]; then
+          CMD="$CMD --output ${{ inputs.output-file }}"
+        fi
+
+        if [ -n "${{ inputs.fail-on }}" ]; then
+          CMD="$CMD --fail-on ${{ inputs.fail-on }}"
+        fi
+
+        if [ -n "${{ inputs.engines }}" ]; then
+          CMD="$CMD --include ${{ inputs.engines }}"
+        fi
+
+        if [ -n "${{ inputs.exclude-engines }}" ]; then
+          CMD="$CMD --exclude ${{ inputs.exclude-engines }}"
+        fi
+
+        if [ -n "${{ inputs.baseline }}" ]; then
+          CMD="$CMD --baseline ${{ inputs.baseline }}"
+        fi
+
+        if [ -n "${{ inputs.config }}" ]; then
+          CMD="$CMD --config ${{ inputs.config }}"
+        fi
+
+        # PR annotations
+        if [ "${{ inputs.pr-annotations }}" = "true" ] && [ -n "${{ github.event.pull_request.number }}" ]; then
+          CMD="$CMD --pr ${{ github.event.pull_request.number }}"
+        fi
+
+        echo "Running: $CMD"
+        $CMD
+        EXIT_CODE=$?
+
+        echo "exit-code=$EXIT_CODE" >> $GITHUB_OUTPUT
+        echo "sarif-file=${{ inputs.output-file }}" >> $GITHUB_OUTPUT
+
+        # Parse findings count from output if JSON
+        if [ -f "${{ inputs.output-file }}" ]; then
+          if command -v jq &> /dev/null; then
+            FINDINGS=$(jq -r '.runs[0].results | length // 0' "${{ inputs.output-file }}" 2>/dev/null || echo "0")
+            CRITICAL=$(jq -r '[.runs[0].results[] | select(.level == "error" and .properties.security-severity >= "9.0")] | length // 0' "${{ inputs.output-file }}" 2>/dev/null || echo "0")
+            HIGH=$(jq -r '[.runs[0].results[] | select(.level == "error" or .level == "warning")] | length // 0' "${{ inputs.output-file }}" 2>/dev/null || echo "0")
+            echo "findings-count=$FINDINGS" >> $GITHUB_OUTPUT
+            echo "critical-count=$CRITICAL" >> $GITHUB_OUTPUT
+            echo "high-count=$HIGH" >> $GITHUB_OUTPUT
+          fi
+        fi
+
+        exit $EXIT_CODE
+
+    - name: Upload SARIF to GitHub Security
+      if: inputs.upload-sarif == 'true' && inputs.output-format == 'sarif'
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: ${{ inputs.output-file }}
+        category: verdictsec
+      continue-on-error: true
