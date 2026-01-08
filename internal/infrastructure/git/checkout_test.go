@@ -117,7 +117,7 @@ func TestCheckoutHelper(t *testing.T) {
 	mustRun(t, tempDir, "git", "commit", "-m", "second commit")
 
 	helper := NewCheckoutHelper(tempDir)
-	defer helper.Cleanup()
+	defer func() { _ = helper.Cleanup() }()
 
 	t.Run("ValidateRef valid ref", func(t *testing.T) {
 		err := helper.ValidateRef("v1.0.0")

@@ -141,7 +141,7 @@ func (p *BitbucketProvider) GetChangedFiles(ctx context.Context) ([]string, erro
 
 		if resp.StatusCode != http.StatusOK {
 			body, _ := io.ReadAll(resp.Body)
-			return nil, fmt.Errorf("Bitbucket API error: %s - %s", resp.Status, string(body))
+			return nil, fmt.Errorf("bitbucket API error: %s - %s", resp.Status, string(body))
 		}
 
 		var diffstat bitbucketDiffstatResponse
@@ -239,7 +239,7 @@ func (p *BitbucketProvider) createComment(ctx context.Context, comment bitbucket
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		respBody, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("Bitbucket API error: %s - %s", resp.Status, string(respBody))
+		return fmt.Errorf("bitbucket API error: %s - %s", resp.Status, string(respBody))
 	}
 
 	return nil

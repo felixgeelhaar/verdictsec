@@ -231,7 +231,7 @@ func TestInlineSuppressionService_QuickFilter(t *testing.T) {
 	// For unit testing, we just verify the service creates properly
 	service := NewInlineSuppressionService()
 	if service == nil {
-		t.Error("Expected non-nil service")
+		t.Fatal("Expected non-nil service")
 	}
 	if service.parser == nil {
 		t.Error("Expected non-nil parser")

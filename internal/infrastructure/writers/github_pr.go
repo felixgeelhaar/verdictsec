@@ -67,7 +67,7 @@ func (w *GitHubPRWriter) WriteAssessment(a *assessment.Assessment, result servic
 	}
 
 	// Log to console
-	w.console.WriteProgress(fmt.Sprintf("Posted %d findings to PR #%d (%d total findings, %d in PR files)",
+	_ = w.console.WriteProgress(fmt.Sprintf("Posted %d findings to PR #%d (%d total findings, %d in PR files)",
 		len(prFindings), w.prNumber, len(allFindings), len(prFindings)))
 
 	return nil

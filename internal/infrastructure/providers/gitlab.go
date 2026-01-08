@@ -141,11 +141,6 @@ func (p *GitLabProvider) GetChangedFiles(ctx context.Context) ([]string, error) 
 	return files, nil
 }
 
-// gitLabDiscussionNote represents a note in a discussion.
-type gitLabDiscussionNote struct {
-	Body string `json:"body"`
-}
-
 // gitLabDiscussionPosition represents the position of a discussion.
 type gitLabDiscussionPosition struct {
 	BaseSHA      string `json:"base_sha,omitempty"`

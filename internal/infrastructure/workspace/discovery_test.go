@@ -250,5 +250,5 @@ func createGoModHelper(dir, moduleName, goVersion string) {
 	}
 
 	content := "module " + moduleName + "\n\ngo " + goVersion + "\n"
-	os.WriteFile(filepath.Join(dir, "go.mod"), []byte(content), 0644)
+	_ = os.WriteFile(filepath.Join(dir, "go.mod"), []byte(content), 0644)
 }

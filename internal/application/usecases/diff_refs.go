@@ -79,7 +79,7 @@ func (uc *DiffRefsUseCase) Execute(ctx context.Context, input DiffRefsInput) (Di
 
 	// Create checkout helper
 	helper := git.NewCheckoutHelper(input.RepoPath)
-	defer helper.Cleanup()
+	defer func() { _ = helper.Cleanup() }()
 
 	// Validate refs exist
 	if err := helper.ValidateRef(refRange.From); err != nil {

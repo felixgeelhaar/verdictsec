@@ -30,7 +30,6 @@ type ApplyFixOutput struct {
 // ApplyFixUseCase handles applying AI-generated fixes to code.
 type ApplyFixUseCase struct {
 	store   *fixer.Store
-	applier *fixer.Applier
 	advisor ports.Advisor
 }
 
