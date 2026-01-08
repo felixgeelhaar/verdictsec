@@ -15,6 +15,7 @@ import (
 	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/baseline"
 	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/config"
 	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/engines"
+	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/fixer"
 	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/watcher"
 	"github.com/felixgeelhaar/verdictsec/pkg/exitcode"
 	"github.com/spf13/cobra"
@@ -147,6 +148,12 @@ func runScan(cmd *cobra.Command, args []string) error {
 	scanOutput, err := scanUseCase.Execute(ctx, scanInput)
 	if err != nil {
 		return fmt.Errorf("scan failed: %w", err)
+	}
+
+	// Save scan results for 'verdict fix' command
+	fixerStore := fixer.NewStore()
+	if err := fixerStore.SaveFromAssessment(scanOutput.Assessment); err != nil {
+		_ = writer.WriteProgress(fmt.Sprintf("Warning: failed to save scan results: %v", err))
 	}
 
 	// Load baseline if specified
@@ -368,6 +375,12 @@ func runSingleScan(ctx context.Context, cfg *config.Config, target string, write
 	if err != nil {
 		_ = writer.WriteError(fmt.Errorf("scan failed: %w", err))
 		return
+	}
+
+	// Save scan results for 'verdict fix' command
+	fixerStore := fixer.NewStore()
+	if err := fixerStore.SaveFromAssessment(scanOutput.Assessment); err != nil {
+		_ = writer.WriteProgress(fmt.Sprintf("Warning: failed to save scan results: %v", err))
 	}
 
 	// Load baseline if specified
