@@ -174,6 +174,7 @@ func (d *Discovery) shouldInclude(relPath string) bool {
 
 // parseGoMod extracts module info from a go.mod file.
 func (d *Discovery) parseGoMod(path string) (Module, error) {
+	// #nosec G304 -- path is from filepath.Walk within baseDir, not user input
 	file, err := os.Open(path)
 	if err != nil {
 		return Module{}, err

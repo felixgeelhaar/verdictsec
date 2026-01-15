@@ -91,6 +91,7 @@ func runHookInstall(cmd *cobra.Command, args []string) error {
 
 	// Check if hook already exists
 	if _, err := os.Stat(hookPath); err == nil {
+		// #nosec G304 -- hookPath is constructed from git directory, not user input
 		content, _ := os.ReadFile(hookPath)
 		if !hookForce {
 			if containsMarker(string(content)) {
@@ -105,6 +106,7 @@ func runHookInstall(cmd *cobra.Command, args []string) error {
 
 	// Ensure hooks directory exists
 	hooksDir := filepath.Dir(hookPath)
+	// #nosec G301 -- 0755 is standard for git hooks directory (needs to be executable)
 	if err := os.MkdirAll(hooksDir, 0755); err != nil {
 		return fmt.Errorf("failed to create hooks directory: %w", err)
 	}
@@ -113,6 +115,7 @@ func runHookInstall(cmd *cobra.Command, args []string) error {
 	hookScript := generateHookScript()
 
 	// Write hook file
+	// #nosec G306 -- 0755 is required for executable git hook scripts
 	if err := os.WriteFile(hookPath, []byte(hookScript), 0755); err != nil {
 		return fmt.Errorf("failed to write hook: %w", err)
 	}
@@ -152,6 +155,7 @@ func runHookUninstall(cmd *cobra.Command, args []string) error {
 
 	hookPath := filepath.Join(gitDir, "hooks", "pre-commit")
 
+	// #nosec G304 -- hookPath is constructed from git directory, not user input
 	content, err := os.ReadFile(hookPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -191,6 +195,7 @@ func runHookStatus(cmd *cobra.Command, args []string) error {
 
 	hookPath := filepath.Join(gitDir, "hooks", "pre-commit")
 
+	// #nosec G304 -- hookPath is constructed from git directory, not user input
 	content, err := os.ReadFile(hookPath)
 	if err != nil {
 		if os.IsNotExist(err) {

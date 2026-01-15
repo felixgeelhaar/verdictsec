@@ -180,6 +180,7 @@ func (a *Adapter) buildArgs(target ports.Target, config ports.EngineConfig) []st
 
 // detectVersion runs trivy version to get version info.
 func (a *Adapter) detectVersion() string {
+	// #nosec G204 -- binaryPath is configured at initialization, not user input
 	cmd := exec.Command(a.binaryPath, "--version")
 	output, err := cmd.Output()
 	if err != nil {

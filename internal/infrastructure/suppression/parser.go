@@ -58,6 +58,7 @@ func NewParser() *Parser {
 
 // ParseFile parses inline suppressions from a single file.
 func (p *Parser) ParseFile(filePath string) ([]InlineSuppression, error) {
+	// #nosec G304 -- filePath comes from findings locations, which are from scanning the target directory
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, err

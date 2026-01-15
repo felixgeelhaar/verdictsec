@@ -71,6 +71,7 @@ func (h *CheckoutHelper) CheckoutToTemp(ref string) (string, error) {
 	}
 
 	// Clone the repository to temp with --no-checkout
+	// #nosec G204 -- absRepoPath is validated via filepath.Abs, tempDir is from os.MkdirTemp
 	cloneCmd := exec.Command("git", "clone", "--no-checkout", "--shared", absRepoPath, tempDir)
 	cloneCmd.Dir = h.repoPath
 	if output, err := cloneCmd.CombinedOutput(); err != nil {

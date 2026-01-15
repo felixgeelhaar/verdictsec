@@ -72,6 +72,7 @@ func (a *Applier) Apply(suggestion advisory.CodeSuggestion) (*ApplyResult, error
 	}
 
 	// Read the original file
+	// #nosec G304 -- filePath is from finding locations within the scanned project
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		result.Error = fmt.Errorf("failed to read file: %w", err)
@@ -104,6 +105,7 @@ func (a *Applier) Apply(suggestion advisory.CodeSuggestion) (*ApplyResult, error
 	result.BackupPath = backupPath
 
 	// Write modified content
+	// #nosec G306 -- 0644 is standard for source files (readable by all, writable by owner)
 	if err := os.WriteFile(filePath, []byte(modified), 0644); err != nil {
 		result.Error = fmt.Errorf("failed to write file: %w", err)
 		return result, result.Error
@@ -238,11 +240,13 @@ func (a *Applier) runGoFmt(filePath string) error {
 
 // Rollback restores a file from backup.
 func (a *Applier) Rollback(backupPath, targetPath string) error {
+	// #nosec G304 -- backupPath is from our own backup directory structure
 	content, err := os.ReadFile(backupPath)
 	if err != nil {
 		return fmt.Errorf("failed to read backup: %w", err)
 	}
 
+	// #nosec G306 -- 0644 is standard for source files (readable by all, writable by owner)
 	if err := os.WriteFile(targetPath, content, 0644); err != nil {
 		return fmt.Errorf("failed to restore file: %w", err)
 	}

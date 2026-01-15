@@ -114,6 +114,7 @@ func (a *Adapter) Run(ctx context.Context, target ports.Target, config ports.Eng
 	// Build arguments
 	args := a.buildArgs(target, config)
 
+	// #nosec G204 -- semgrep is a trusted binary, args are built from validated config
 	cmd := exec.CommandContext(ctx, "semgrep", args...)
 
 	var stdout, stderr bytes.Buffer
