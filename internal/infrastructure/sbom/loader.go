@@ -63,6 +63,8 @@ func (l *Loader) LoadFromBytes(_ context.Context, data []byte, format domainsbom
 		return l.parseCycloneDX(data)
 	case domainsbom.FormatSyft:
 		return l.parseSyft(data)
+	case domainsbom.FormatSPDX:
+		return l.parseSPDX(data)
 	case domainsbom.FormatUnknown:
 		// Try auto-detection
 		detected := detectFormat(data)
@@ -189,6 +191,16 @@ func (l *Loader) parseSyft(data []byte) (*domainsbom.SBOM, error) {
 		output.Descriptor.Name,
 		output.Descriptor.Version,
 	), nil
+}
+
+// parseSPDX converts SPDX JSON to domain SBOM.
+func (l *Loader) parseSPDX(data []byte) (*domainsbom.SBOM, error) {
+	parser := NewSPDXParser()
+	doc, err := parser.ParseDocument(data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse SPDX: %w", err)
+	}
+	return parser.ToSBOM(doc)
 }
 
 // detectFormat attempts to detect the SBOM format from raw bytes.

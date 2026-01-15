@@ -84,6 +84,8 @@ type EnginesConfig struct {
 	Syft        EngineSettings `yaml:"syft" json:"syft"`
 	Staticcheck EngineSettings `yaml:"staticcheck" json:"staticcheck"`
 	Trivy       EngineSettings `yaml:"trivy" json:"trivy"`
+	GoLicenses  EngineSettings `yaml:"go-licenses" json:"go-licenses"`
+	Semgrep     EngineSettings `yaml:"semgrep" json:"semgrep"`
 }
 
 // EngineSettings holds settings for a single engine.
@@ -182,6 +184,18 @@ func DefaultConfig() *Config {
 				Exclude:  []string{},
 				Settings: map[string]string{},
 			},
+			GoLicenses: EngineSettings{
+				Enabled:  false, // Disabled by default - opt-in for license scanning
+				Severity: "LOW",
+				Exclude:  []string{},
+				Settings: map[string]string{},
+			},
+			Semgrep: EngineSettings{
+				Enabled:  false, // Disabled by default - opt-in for semgrep SAST
+				Severity: "LOW",
+				Exclude:  []string{},
+				Settings: map[string]string{},
+			},
 		},
 		Output: OutputConfig{
 			Format:    "console",
@@ -237,6 +251,8 @@ func (c *Config) ToPortsConfig() ports.Config {
 			ports.EngineSyft:        c.toEngineConfig(c.Engines.Syft),
 			ports.EngineStaticcheck: c.toEngineConfig(c.Engines.Staticcheck),
 			ports.EngineTrivy:       c.toEngineConfig(c.Engines.Trivy),
+			ports.EngineLicense:     c.toEngineConfig(c.Engines.GoLicenses),
+			ports.EngineSemgrep:     c.toEngineConfig(c.Engines.Semgrep),
 		},
 		Output: ports.OutputConfig{
 			Format:    c.GetOutputFormat(),
@@ -383,6 +399,12 @@ func (c *Config) EngineConfig(engineID string) ports.EngineConfig {
 		return c.toEngineConfig(c.Engines.Syft)
 	case "staticcheck":
 		return c.toEngineConfig(c.Engines.Staticcheck)
+	case "trivy":
+		return c.toEngineConfig(c.Engines.Trivy)
+	case "go-licenses":
+		return c.toEngineConfig(c.Engines.GoLicenses)
+	case "semgrep":
+		return c.toEngineConfig(c.Engines.Semgrep)
 	default:
 		return ports.EngineConfig{Enabled: false}
 	}

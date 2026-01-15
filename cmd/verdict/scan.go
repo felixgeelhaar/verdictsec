@@ -254,6 +254,12 @@ func determineEngines(cfg *config.Config) []string {
 	if cfg.Engines.Trivy.Enabled {
 		engineIDs = append(engineIDs, "trivy")
 	}
+	if cfg.Engines.GoLicenses.Enabled {
+		engineIDs = append(engineIDs, "go-licenses")
+	}
+	if cfg.Engines.Semgrep.Enabled {
+		engineIDs = append(engineIDs, "semgrep")
+	}
 
 	// Apply exclusions
 	if len(excludeEngines) > 0 {

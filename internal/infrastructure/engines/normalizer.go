@@ -6,6 +6,8 @@ import (
 	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/engines/gitleaks"
 	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/engines/gosec"
 	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/engines/govulncheck"
+	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/engines/license"
+	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/engines/semgrep"
 	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/engines/staticcheck"
 	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/engines/trivy"
 )
@@ -17,6 +19,8 @@ type NormalizerConfig struct {
 	GitleaksMappings    map[string]finding.Severity
 	StaticcheckMappings map[string]finding.Severity
 	TrivyMappings       map[string]finding.Severity
+	LicenseMappings     map[string]finding.Severity
+	SemgrepMappings     map[string]finding.Severity
 }
 
 // CompositeNormalizer dispatches to the appropriate engine normalizer.
@@ -26,6 +30,8 @@ type CompositeNormalizer struct {
 	gitleaksNorm    *gitleaks.Normalizer
 	staticcheckNorm *staticcheck.Normalizer
 	trivyNorm       *trivy.Normalizer
+	licenseNorm     *license.Normalizer
+	semgrepNorm     *semgrep.Normalizer
 }
 
 // NewCompositeNormalizer creates a normalizer that handles all engines.
@@ -36,6 +42,8 @@ func NewCompositeNormalizer() *CompositeNormalizer {
 		gitleaksNorm:    gitleaks.NewNormalizer(),
 		staticcheckNorm: staticcheck.NewNormalizer(),
 		trivyNorm:       trivy.NewNormalizer(),
+		licenseNorm:     license.NewNormalizer(),
+		semgrepNorm:     semgrep.NewNormalizer(),
 	}
 }
 
@@ -47,6 +55,8 @@ func NewCompositeNormalizerWithConfig(cfg NormalizerConfig) *CompositeNormalizer
 		gitleaksNorm:    gitleaks.NewNormalizerWithOverrides(cfg.GitleaksMappings),
 		staticcheckNorm: staticcheck.NewNormalizerWithOverrides(cfg.StaticcheckMappings),
 		trivyNorm:       trivy.NewNormalizer(),
+		licenseNorm:     license.NewNormalizer(),
+		semgrepNorm:     semgrep.NewNormalizer(),
 	}
 }
 
@@ -84,6 +94,10 @@ func (n *CompositeNormalizer) Normalize(engineID ports.EngineID, raw ports.RawFi
 		return n.staticcheckNorm.Normalize(engineID, raw)
 	case ports.EngineTrivy:
 		return n.trivyNorm.Normalize(engineID, raw)
+	case ports.EngineLicense:
+		return n.licenseNorm.Normalize(engineID, raw)
+	case ports.EngineSemgrep:
+		return n.semgrepNorm.Normalize(engineID, raw)
 	case ports.EngineCycloneDX, ports.EngineSyft:
 		// CycloneDX and Syft produce SBOM, not findings - return nil
 		return nil

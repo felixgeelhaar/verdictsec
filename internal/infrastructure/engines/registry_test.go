@@ -321,8 +321,8 @@ func TestNewDefaultRegistry(t *testing.T) {
 	registry := NewDefaultRegistry()
 
 	assert.NotNil(t, registry)
-	// Default registry should have 7 engines: gosec, govulncheck, gitleaks, cyclonedx, syft, staticcheck, trivy
-	assert.Equal(t, 7, registry.Count())
+	// Default registry should have 9 engines: gosec, govulncheck, gitleaks, cyclonedx, syft, staticcheck, trivy, license, semgrep
+	assert.Equal(t, 9, registry.Count())
 
 	// Verify all expected engines are registered
 	_, hasGosec := registry.Get(ports.EngineGosec)
@@ -345,15 +345,21 @@ func TestNewDefaultRegistry(t *testing.T) {
 
 	_, hasTrivy := registry.Get(ports.EngineTrivy)
 	assert.True(t, hasTrivy)
+
+	_, hasLicense := registry.Get(ports.EngineLicense)
+	assert.True(t, hasLicense)
+
+	_, hasSemgrep := registry.Get(ports.EngineSemgrep)
+	assert.True(t, hasSemgrep)
 }
 
 func TestNewDefaultRegistry_EngineCapabilities(t *testing.T) {
 	registry := NewDefaultRegistry()
 
 	// Verify engines have correct capabilities
-	// Two SAST engines: gosec (security-focused) and staticcheck (dead code detection)
+	// Three SAST engines: gosec (security-focused), staticcheck (dead code detection), semgrep (custom rules)
 	sastEngines := registry.GetByCapability(ports.CapabilitySAST)
-	assert.Len(t, sastEngines, 2)
+	assert.Len(t, sastEngines, 3)
 
 	sastEngineIDs := make([]ports.EngineID, len(sastEngines))
 	for i, e := range sastEngines {
@@ -361,6 +367,7 @@ func TestNewDefaultRegistry_EngineCapabilities(t *testing.T) {
 	}
 	assert.Contains(t, sastEngineIDs, ports.EngineGosec)
 	assert.Contains(t, sastEngineIDs, ports.EngineStaticcheck)
+	assert.Contains(t, sastEngineIDs, ports.EngineSemgrep)
 
 	// Two Vuln engines: govulncheck (Go-specific) and trivy (general purpose)
 	vulnEngines := registry.GetByCapability(ports.CapabilityVuln)

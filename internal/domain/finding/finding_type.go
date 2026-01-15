@@ -16,6 +16,7 @@ const (
 	FindingTypeVuln
 	FindingTypeSecret
 	FindingTypeSBOM
+	FindingTypeLicense
 )
 
 var findingTypeNames = map[FindingType]string{
@@ -24,6 +25,7 @@ var findingTypeNames = map[FindingType]string{
 	FindingTypeVuln:    "vuln",
 	FindingTypeSecret:  "secret",
 	FindingTypeSBOM:    "sbom",
+	FindingTypeLicense: "license",
 }
 
 var findingTypeValues = map[string]FindingType{
@@ -32,6 +34,7 @@ var findingTypeValues = map[string]FindingType{
 	"vuln":    FindingTypeVuln,
 	"secret":  FindingTypeSecret,
 	"sbom":    FindingTypeSBOM,
+	"license": FindingTypeLicense,
 }
 
 // String returns the string representation of the finding type.
@@ -94,5 +97,6 @@ func AllFindingTypes() []FindingType {
 		FindingTypeVuln,
 		FindingTypeSecret,
 		FindingTypeSBOM,
+		FindingTypeLicense,
 	}
 }

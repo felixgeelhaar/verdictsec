@@ -5,6 +5,8 @@ import (
 	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/engines/gitleaks"
 	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/engines/gosec"
 	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/engines/govulncheck"
+	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/engines/license"
+	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/engines/semgrep"
 	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/engines/staticcheck"
 	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/engines/syft"
 	"github.com/felixgeelhaar/verdictsec/internal/infrastructure/engines/trivy"
@@ -22,6 +24,8 @@ func NewDefaultRegistry() *Registry {
 	r.Register(syft.NewAdapter())
 	r.Register(staticcheck.NewAdapter())
 	r.Register(trivy.NewAdapter())
+	r.Register(license.NewAdapter())
+	r.Register(semgrep.NewAdapter())
 
 	return r
 }

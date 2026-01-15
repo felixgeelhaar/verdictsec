@@ -18,6 +18,8 @@ const (
 	EngineSyft        EngineID = "syft"
 	EngineStaticcheck EngineID = "staticcheck"
 	EngineTrivy       EngineID = "trivy"
+	EngineLicense     EngineID = "go-licenses"
+	EngineSemgrep     EngineID = "semgrep"
 )
 
 // Capability represents what a scanner can do.
@@ -30,6 +32,7 @@ const (
 	CapabilitySecrets   Capability = "secrets"
 	CapabilitySBOM      Capability = "sbom"
 	CapabilityContainer Capability = "container"
+	CapabilityLicense   Capability = "license"
 )
 
 // Target represents what to scan.

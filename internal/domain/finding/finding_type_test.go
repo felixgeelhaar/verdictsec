@@ -78,9 +78,10 @@ func TestFindingType_IsValid(t *testing.T) {
 
 func TestAllFindingTypes(t *testing.T) {
 	types := AllFindingTypes()
-	assert.Len(t, types, 5)
+	assert.Len(t, types, 6)
 	assert.Equal(t, FindingTypeUnknown, types[0])
 	assert.Equal(t, FindingTypeSBOM, types[4])
+	assert.Equal(t, FindingTypeLicense, types[5])
 }
 
 func TestFindingType_JSONRoundTrip(t *testing.T) {
