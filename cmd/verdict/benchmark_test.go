@@ -242,7 +242,7 @@ func TestOutputBenchmarkJSON(t *testing.T) {
 	require.NoError(t, err)
 
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
+	_, _ = buf.ReadFrom(r)
 	output := buf.String()
 
 	// Verify it's valid JSON
@@ -301,7 +301,7 @@ func TestOutputBenchmarkText(t *testing.T) {
 	require.NoError(t, err)
 
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
+	_, _ = buf.ReadFrom(r)
 	output := buf.String()
 
 	// Verify output contains expected sections
@@ -360,7 +360,7 @@ func TestOutputBenchmarkText_EnginesOnly(t *testing.T) {
 	require.NoError(t, err)
 
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
+	_, _ = buf.ReadFrom(r)
 	output := buf.String()
 
 	// Should NOT contain overall stats when engines-only
@@ -403,7 +403,7 @@ func TestOutputBenchmarkText_NoData(t *testing.T) {
 	require.NoError(t, err)
 
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
+	_, _ = buf.ReadFrom(r)
 	output := buf.String()
 
 	assert.Contains(t, output, "(no data)")

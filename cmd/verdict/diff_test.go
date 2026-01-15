@@ -85,7 +85,7 @@ func TestWriteFindingLine(t *testing.T) {
 	os.Stdout = oldStdout
 
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
+	_, _ = buf.ReadFrom(r)
 	output := buf.String()
 
 	assert.Contains(t, output, "Hardcoded credentials")
@@ -126,7 +126,7 @@ func TestWriteDiffConsole_EmptyDiff(t *testing.T) {
 	os.Stdout = oldStdout
 
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
+	_, _ = buf.ReadFrom(r)
 	// Output will be empty since we didn't call the function
 	// This test mainly verifies the structure compiles
 }

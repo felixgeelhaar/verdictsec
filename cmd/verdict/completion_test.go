@@ -35,7 +35,7 @@ func TestCompletionCmd_Bash(t *testing.T) {
 	require.NoError(t, err)
 
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
+	_, _ = buf.ReadFrom(r)
 	output := buf.String()
 
 	// Bash completion should contain certain patterns
@@ -56,7 +56,7 @@ func TestCompletionCmd_Zsh(t *testing.T) {
 	require.NoError(t, err)
 
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
+	_, _ = buf.ReadFrom(r)
 	output := buf.String()
 
 	// Zsh completion should have output
@@ -77,7 +77,7 @@ func TestCompletionCmd_Fish(t *testing.T) {
 	require.NoError(t, err)
 
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
+	_, _ = buf.ReadFrom(r)
 	output := buf.String()
 
 	// Fish completion should have output
@@ -98,7 +98,7 @@ func TestCompletionCmd_Powershell(t *testing.T) {
 	require.NoError(t, err)
 
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
+	_, _ = buf.ReadFrom(r)
 	output := buf.String()
 
 	// Powershell completion should have output
