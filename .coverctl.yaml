@@ -7,7 +7,7 @@ policy:
     - name: cmd
       match:
         - ./cmd/...
-      min: 29  # CLI command wiring, many paths skip when engines not installed (includes benchmark mode)
+      min: 50  # CLI command wiring
     - name: application
       match:
         - ./internal/application/...
@@ -19,7 +19,7 @@ policy:
     - name: infrastructure
       match:
         - ./internal/infrastructure/...
-      min: 53  # External integrations, many require real tools (includes TUI with limited test coverage)
+      min: 60  # External integrations
     - name: pkg
       match:
         - ./pkg/...
