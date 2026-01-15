@@ -97,6 +97,8 @@ func TestCheckoutHelper(t *testing.T) {
 	mustRun(t, tempDir, "git", "init")
 	mustRun(t, tempDir, "git", "config", "user.email", "test@test.com")
 	mustRun(t, tempDir, "git", "config", "user.name", "Test User")
+	mustRun(t, tempDir, "git", "config", "commit.gpgsign", "false")
+	mustRun(t, tempDir, "git", "config", "tag.gpgsign", "false")
 
 	// Create initial commit
 	testFile := filepath.Join(tempDir, "test.txt")

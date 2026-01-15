@@ -1,0 +1,186 @@
+name: 'VerdictSec Security Scan'
+description: 'Run comprehensive security scans on Go projects using VerdictSec'
+author: 'Felix Geelhaar'
+
+branding:
+  icon: 'shield'
+  color: 'green'
+
+inputs:
+  path:
+    description: 'Path to scan (default: current directory)'
+    required: false
+    default: '.'
+  mode:
+    description: 'Scan mode: scan, ci, sast, vuln, secrets, sbom'
+    required: false
+    default: 'ci'
+  fail-on:
+    description: 'Minimum severity to fail: critical, high, medium, low'
+    required: false
+    default: 'high'
+  output-format:
+    description: 'Output format: console, json, sarif'
+    required: false
+    default: 'sarif'
+  output-file:
+    description: 'Output file path'
+    required: false
+    default: 'verdict-results.sarif'
+  config:
+    description: 'Path to VerdictSec config file'
+    required: false
+    default: ''
+  baseline:
+    description: 'Path to baseline file'
+    required: false
+    default: ''
+  upload-sarif:
+    description: 'Upload SARIF to GitHub Security tab'
+    required: false
+    default: 'true'
+  go-version:
+    description: 'Go version to use'
+    required: false
+    default: '1.23'
+  install-tools:
+    description: 'Install security tools (gosec, govulncheck, gitleaks)'
+    required: false
+    default: 'true'
+  verdict-version:
+    description: 'VerdictSec version to install (default: latest)'
+    required: false
+    default: 'latest'
+
+outputs:
+  decision:
+    description: 'Scan decision: PASS, WARN, FAIL, ERROR'
+    value: ${{ steps.scan.outputs.decision }}
+  findings-count:
+    description: 'Total number of findings'
+    value: ${{ steps.scan.outputs.findings_count }}
+  critical-count:
+    description: 'Number of critical findings'
+    value: ${{ steps.scan.outputs.critical_count }}
+  high-count:
+    description: 'Number of high severity findings'
+    value: ${{ steps.scan.outputs.high_count }}
+  medium-count:
+    description: 'Number of medium severity findings'
+    value: ${{ steps.scan.outputs.medium_count }}
+  low-count:
+    description: 'Number of low severity findings'
+    value: ${{ steps.scan.outputs.low_count }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ inputs.go-version }}
+
+    - name: Install VerdictSec
+      shell: bash
+      run: |
+        if [ "${{ inputs.verdict-version }}" = "latest" ]; then
+          go install github.com/felixgeelhaar/verdictsec/cmd/verdict@latest
+        else
+          go install github.com/felixgeelhaar/verdictsec/cmd/verdict@${{ inputs.verdict-version }}
+        fi
+
+    - name: Install Security Tools
+      if: inputs.install-tools == 'true'
+      shell: bash
+      run: |
+        echo "Installing security tools..."
+        go install github.com/securego/gosec/v2/cmd/gosec@latest
+        go install golang.org/x/vuln/cmd/govulncheck@latest
+        go install github.com/gitleaks/gitleaks/v8@latest
+        echo "Security tools installed successfully"
+
+    - name: Run VerdictSec Scan
+      id: scan
+      shell: bash
+      run: |
+        set +e
+
+        # Build command arguments
+        ARGS="${{ inputs.mode }} ${{ inputs.path }}"
+
+        # Add output format
+        if [ "${{ inputs.output-format }}" = "sarif" ]; then
+          ARGS="$ARGS --sarif"
+        elif [ "${{ inputs.output-format }}" = "json" ]; then
+          ARGS="$ARGS --json"
+        fi
+
+        # Add output file
+        if [ -n "${{ inputs.output-file }}" ]; then
+          ARGS="$ARGS -o ${{ inputs.output-file }}"
+        fi
+
+        # Add config if specified
+        if [ -n "${{ inputs.config }}" ]; then
+          ARGS="$ARGS --config ${{ inputs.config }}"
+        fi
+
+        # Add baseline if specified
+        if [ -n "${{ inputs.baseline }}" ]; then
+          ARGS="$ARGS --baseline ${{ inputs.baseline }}"
+        fi
+
+        echo "Running: verdict $ARGS"
+        verdict $ARGS
+        EXIT_CODE=$?
+
+        # Determine decision based on exit code
+        case $EXIT_CODE in
+          0)
+            echo "decision=PASS" >> $GITHUB_OUTPUT
+            ;;
+          1)
+            echo "decision=FAIL" >> $GITHUB_OUTPUT
+            ;;
+          *)
+            echo "decision=ERROR" >> $GITHUB_OUTPUT
+            ;;
+        esac
+
+        # Parse findings from output if JSON
+        if [ -f "${{ inputs.output-file }}" ] && [ "${{ inputs.output-format }}" = "json" ]; then
+          FINDINGS=$(cat "${{ inputs.output-file }}" | jq -r '.findings | length // 0' 2>/dev/null || echo "0")
+          CRITICAL=$(cat "${{ inputs.output-file }}" | jq -r '[.findings[] | select(.severity == "CRITICAL")] | length // 0' 2>/dev/null || echo "0")
+          HIGH=$(cat "${{ inputs.output-file }}" | jq -r '[.findings[] | select(.severity == "HIGH")] | length // 0' 2>/dev/null || echo "0")
+          MEDIUM=$(cat "${{ inputs.output-file }}" | jq -r '[.findings[] | select(.severity == "MEDIUM")] | length // 0' 2>/dev/null || echo "0")
+          LOW=$(cat "${{ inputs.output-file }}" | jq -r '[.findings[] | select(.severity == "LOW")] | length // 0' 2>/dev/null || echo "0")
+
+          echo "findings_count=$FINDINGS" >> $GITHUB_OUTPUT
+          echo "critical_count=$CRITICAL" >> $GITHUB_OUTPUT
+          echo "high_count=$HIGH" >> $GITHUB_OUTPUT
+          echo "medium_count=$MEDIUM" >> $GITHUB_OUTPUT
+          echo "low_count=$LOW" >> $GITHUB_OUTPUT
+        else
+          echo "findings_count=0" >> $GITHUB_OUTPUT
+          echo "critical_count=0" >> $GITHUB_OUTPUT
+          echo "high_count=0" >> $GITHUB_OUTPUT
+          echo "medium_count=0" >> $GITHUB_OUTPUT
+          echo "low_count=0" >> $GITHUB_OUTPUT
+        fi
+
+        exit $EXIT_CODE
+
+    - name: Upload SARIF to GitHub Security
+      if: inputs.upload-sarif == 'true' && inputs.output-format == 'sarif' && always()
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: ${{ inputs.output-file }}
+      continue-on-error: true
+
+    - name: Upload Scan Results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: verdict-security-results
+        path: ${{ inputs.output-file }}
+        if-no-files-found: ignore
