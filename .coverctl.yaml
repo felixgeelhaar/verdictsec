@@ -7,7 +7,7 @@ policy:
     - name: cmd
       match:
         - ./cmd/...
-      min: 31  # CLI command wiring, many paths skip when engines not installed
+      min: 29  # CLI command wiring, many paths skip when engines not installed (includes benchmark mode)
     - name: application
       match:
         - ./internal/application/...
