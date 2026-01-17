@@ -27,6 +27,7 @@ type SARIFWriter struct {
 	redactor *redact.Redactor
 	toolName string
 	toolVer  string
+	basePath string // Repository root for converting absolute paths to relative
 }
 
 // SARIFOption configures the SARIF writer.
@@ -47,13 +48,24 @@ func WithToolInfo(name, version string) SARIFOption {
 	}
 }
 
+// WithBasePath sets the repository root path for converting absolute paths to relative.
+func WithBasePath(basePath string) SARIFOption {
+	return func(w *SARIFWriter) {
+		w.basePath = basePath
+	}
+}
+
 // NewSARIFWriter creates a new SARIF writer.
 func NewSARIFWriter(opts ...SARIFOption) *SARIFWriter {
+	// Get current working directory as default base path for relative path conversion
+	basePath, _ := os.Getwd()
+
 	w := &SARIFWriter{
 		out:      os.Stdout,
 		redactor: redact.New(redact.WithPartialDisplay(4, 4)),
 		toolName: "VerdictSec",
 		toolVer:  "1.0.0",
+		basePath: basePath,
 	}
 
 	for _, opt := range opts {
@@ -303,9 +315,22 @@ func (w *SARIFWriter) buildTags(f *finding.Finding) []string {
 }
 
 // normalizeFilePath normalizes file paths for SARIF.
+// It converts absolute paths to relative paths based on the configured basePath.
 func (w *SARIFWriter) normalizeFilePath(path string) string {
 	// Convert to forward slashes for consistency (platform-independent)
 	path = strings.ReplaceAll(path, "\\", "/")
+
+	// If we have a base path, try to make the path relative
+	if w.basePath != "" {
+		basePath := strings.ReplaceAll(w.basePath, "\\", "/")
+		// Ensure basePath ends with a slash for proper prefix matching
+		if !strings.HasSuffix(basePath, "/") {
+			basePath += "/"
+		}
+		// Strip base path prefix if present (works for both Unix and Windows paths)
+		path = strings.TrimPrefix(path, basePath)
+	}
+
 	// Remove leading ./ if present
 	path = strings.TrimPrefix(path, "./")
 	return path

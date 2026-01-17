@@ -354,6 +354,72 @@ func TestSARIFWriter_NormalizeFilePath(t *testing.T) {
 	}
 }
 
+func TestSARIFWriter_NormalizeFilePath_AbsolutePaths(t *testing.T) {
+	tests := []struct {
+		name     string
+		basePath string
+		input    string
+		expected string
+	}{
+		{
+			name:     "absolute path with matching base",
+			basePath: "/Users/dev/project",
+			input:    "/Users/dev/project/pkg/handler.go",
+			expected: "pkg/handler.go",
+		},
+		{
+			name:     "absolute path with base ending in slash",
+			basePath: "/Users/dev/project/",
+			input:    "/Users/dev/project/internal/service.go",
+			expected: "internal/service.go",
+		},
+		{
+			name:     "absolute path not matching base",
+			basePath: "/Users/dev/project",
+			input:    "/Users/other/file.go",
+			expected: "/Users/other/file.go",
+		},
+		{
+			name:     "relative path unchanged",
+			basePath: "/Users/dev/project",
+			input:    "pkg/handler.go",
+			expected: "pkg/handler.go",
+		},
+		{
+			name:     "Windows-style absolute path",
+			basePath: "C:\\Users\\dev\\project",
+			input:    "C:\\Users\\dev\\project\\pkg\\handler.go",
+			expected: "pkg/handler.go",
+		},
+		{
+			name:     "empty base path keeps absolute path",
+			basePath: "",
+			input:    "/Users/dev/project/file.go",
+			expected: "/Users/dev/project/file.go",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			writer := NewSARIFWriter(WithBasePath(tt.basePath))
+			result := writer.normalizeFilePath(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestSARIFWriter_WithBasePath(t *testing.T) {
+	basePath := "/custom/base/path"
+	writer := NewSARIFWriter(WithBasePath(basePath))
+	assert.Equal(t, basePath, writer.basePath)
+}
+
+func TestSARIFWriter_DefaultBasePath(t *testing.T) {
+	writer := NewSARIFWriter()
+	// Should have the current working directory as default
+	assert.NotEmpty(t, writer.basePath)
+}
+
 func TestSARIFWriter_WriteSummary(t *testing.T) {
 	var buf bytes.Buffer
 	writer := NewSARIFWriter(WithSARIFOutput(&buf))
